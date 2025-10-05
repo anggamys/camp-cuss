@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-
 import {
   IsEmail,
   IsString,
@@ -62,8 +60,4 @@ export class CreateUserResponseDto {
   @IsEmail()
   @IsNotEmpty()
   email: string;
-
-  @IsEnum(Role)
-  @IsNotEmpty()
-  role: Role;
 }
