@@ -17,8 +17,8 @@ model users {
   id             Int       @id @default(autoincrement())
   username       String    @unique
   email          String    @unique
-  npm            String?
-  no_phone       String?
+  npm            String
+  no_phone       String
   password       String
   role           Role      @default(customer)
   ktm            String?

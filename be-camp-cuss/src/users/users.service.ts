@@ -1,70 +1,167 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../prisma/prisma.services';
 import { CreateUserDto, CreateUserResponseDto } from './dto/create-user.dto';
-// import { UpdateUserDto } from './dto/update-user.dto';
+import { FindUserResponseDto } from './dto/find-user.dto';
+import { UpdateUserDto, UpdateUserResponseDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
+  private readonly BCRYPT_ROUNDS = 10;
+  private readonly USER_SELECT_FIELDS = {
+    id: true,
+    username: true,
+    email: true,
+    npm: true,
+    no_phone: true,
+    role: true,
+  };
+
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createUserDto: CreateUserDto): Promise<CreateUserResponseDto> {
-    const emailExists = await this.prisma.users.findUnique({
-      where: { email: createUserDto.email },
+  async create(dto: CreateUserDto): Promise<CreateUserResponseDto> {
+    await this.validateUniqueFields(dto.email, dto.username);
+
+    const hashedPassword = await this.hashPassword(dto.password);
+
+    return this.prisma.users.create({
+      data: { ...dto, password: hashedPassword },
+      select: { id: true, email: true },
+    });
+  }
+
+  async findAll(): Promise<FindUserResponseDto[]> {
+    const users = await this.prisma.users.findMany({
+      select: this.USER_SELECT_FIELDS,
     });
 
-    const usernameExists = await this.prisma.users.findUnique({
-      where: { username: createUserDto.username },
-    });
-
-    if (emailExists || usernameExists) {
-      throw new HttpException(
-        'User with this email or username already exists',
-        400,
+    if (users.length === 0) {
+      this.throwNotFound(
+        'No users found',
+        'No users available in the database',
       );
     }
 
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-
-    const newUser = await this.prisma.users.create({
-      data: {
-        ...createUserDto,
-        password: hashedPassword,
-      },
-    });
-
-    return {
-      id: newUser.id,
-      email: newUser.email,
-      role: newUser.role,
-    };
+    return users;
   }
 
-  // async findAll(): Promise<User[]> {
-  //   return this.prisma.user.findMany();
-  // }
+  async findOne(id: number): Promise<FindUserResponseDto> {
+    const user = await this.prisma.users.findUnique({
+      where: { id },
+      select: this.USER_SELECT_FIELDS,
+    });
 
-  // async findOne(id: number): Promise<User | null> {
-  //   return this.prisma.user.findUnique({
-  //     where: { id },
-  //   });
-  // }
+    if (!user) {
+      this.throwNotFound('User not found', 'No user with the given ID exists');
+    }
 
-  // async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
-  //   return this.prisma.user.update({
-  //     where: { id },
-  //     data: updateUserDto,
-  //   });
-  // }
+    return user;
+  }
 
-  // async remove(id: number): Promise<User> {
-  //   return this.prisma.user.delete({
-  //     where: { id },
-  //   });
-  // }
+  async update(
+    id: number,
+    updateUserDto: UpdateUserDto,
+  ): Promise<UpdateUserResponseDto> {
+    const existingUser = await this.findUserById(id);
+
+    await this.validateUniqueFieldsForUpdate(updateUserDto, existingUser);
+
+    const password = updateUserDto.password
+      ? await this.hashPassword(updateUserDto.password)
+      : existingUser.password;
+
+    return this.prisma.users.update({
+      where: { id },
+      data: { ...updateUserDto, password },
+      select: this.USER_SELECT_FIELDS,
+    });
+  }
+
+  async remove(id: number): Promise<null> {
+    await this.findUserById(id);
+    await this.prisma.users.delete({ where: { id } });
+    return null;
+  }
+
+  // Private helper methods
+  private async findUserById(id: number) {
+    const user = await this.prisma.users.findUnique({ where: { id } });
+    if (!user) {
+      this.throwNotFound('User not found', 'No user with the given ID exists');
+    }
+    return user;
+  }
+
+  private async validateUniqueFields(email: string, username: string) {
+    const [emailExists, usernameExists] = await Promise.all([
+      this.prisma.users.findUnique({ where: { email } }),
+      this.prisma.users.findUnique({ where: { username } }),
+    ]);
+
+    if (emailExists || usernameExists) {
+      throw new HttpException(
+        {
+          message: 'Validation failed',
+          errors: {
+            email: emailExists ? 'Email already used' : undefined,
+            username: usernameExists ? 'Username already used' : undefined,
+          },
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  private async validateUniqueFieldsForUpdate(
+    updateDto: UpdateUserDto,
+    existingUser: { email: string; username: string; password: string },
+  ) {
+    const validations: Promise<{ field: string; exists: any }>[] = [];
+
+    if (updateDto.email && updateDto.email !== existingUser.email) {
+      validations.push(
+        this.prisma.users
+          .findUnique({ where: { email: updateDto.email } })
+          .then((exists) => ({ field: 'email', exists })),
+      );
+    }
+
+    if (updateDto.username && updateDto.username !== existingUser.username) {
+      validations.push(
+        this.prisma.users
+          .findUnique({ where: { username: updateDto.username } })
+          .then((exists) => ({ field: 'username', exists })),
+      );
+    }
+
+    if (validations.length > 0) {
+      const results = await Promise.all(validations);
+      const conflicts = results.filter((result) => result.exists);
+
+      if (conflicts.length > 0) {
+        const errors = conflicts.reduce((acc, conflict) => {
+          acc[conflict.field] =
+            `${conflict.field.charAt(0).toUpperCase() + conflict.field.slice(1)} already used`;
+          return acc;
+        }, {});
+
+        throw new HttpException(
+          { message: 'Validation failed', errors },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+  }
+
+  private async hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, this.BCRYPT_ROUNDS);
+  }
+
+  private throwNotFound(message: string, errorDetail: string): never {
+    throw new HttpException(
+      { message, errors: { user: errorDetail } },
+      HttpStatus.NOT_FOUND,
+    );
+  }
 }
