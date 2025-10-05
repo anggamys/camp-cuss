@@ -1,26 +1,50 @@
-# Tahap build
-FROM node:20-alpine AS builder
-WORKDIR /app
+FROM node:22-alpine AS builder
 
-COPY package*.json ./
-RUN npm ci
+# Gunakan user non-root
+USER node
+WORKDIR /home/node/app
 
-COPY . .
+# Salin dan install dependency (dengan cache layer)
+COPY --chown=node:node package*.json ./
+RUN npm ci --ignore-scripts --no-audit --prefer-offline
 
+# Salin seluruh source
+COPY --chown=node:node . .
+
+# Generate Prisma Client
 RUN npx prisma generate
 
+# Build NestJS (hasil ke dist)
 RUN npm run build
+
+# Hapus dependency dev agar image runtime kecil
 RUN npm prune --omit=dev
 
-# Tahap runtime
-FROM node:20-alpine
-WORKDIR /app
+
+FROM node:22-slim AS runtime
+
+# Gunakan user non-root
+USER node
+WORKDIR /home/node/app
+
+# Set environment
 ENV NODE_ENV=production
+ENV PORT=3000
 
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+# Copy hasil build dari builder
+COPY --from=builder --chown=node:node /home/node/app/package*.json ./
+COPY --from=builder --chown=node:node /home/node/app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /home/node/app/dist ./dist
+COPY --from=builder --chown=node:node /home/node/app/prisma ./prisma
 
+# Bersihkan cache & tool tidak penting
+RUN rm -rf /home/node/.npm && \
+    rm -rf /usr/share/doc && \
+    rm -rf /usr/share/man && \
+    rm -rf /tmp/*
+
+# Expose port
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+
+# Jalankan dengan batas memori rendah
+CMD ["sh", "-c", "npx prisma migrate deploy && node --max-old-space-size=128 dist/main.js"]
