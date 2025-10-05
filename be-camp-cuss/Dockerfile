@@ -1,31 +1,50 @@
-FROM node:22-alpine AS builder
-USER node
+# ====== STAGE 1: BUILD ======
+FROM node:22-slim AS builder
+
+# Set timezone & workdir
+ENV TZ=Asia/Jakarta
 WORKDIR /home/node/app
 
-COPY --chown=node:node package*.json ./
+# Salin file package dan install dependency
+COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --prefer-offline
-COPY --chown=node:node . .
+
+# Salin semua file proyek
+COPY . .
+
+# Generate Prisma client (menghasilkan binary untuk Debian)
 RUN npx prisma generate
+
+# Build NestJS
 RUN npm run build
+
+# Hapus dependency dev agar image runtime kecil
 RUN npm prune --omit=dev
 
-FROM node:22-slim AS runtime
-USER node
-WORKDIR /home/node/app
 
+# ====== STAGE 2: RUNTIME ======
+FROM node:22-slim AS runtime
+
+WORKDIR /home/node/app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV TZ=Asia/Jakarta
 
-COPY --from=builder --chown=node:node /home/node/app/package*.json ./
-COPY --from=builder --chown=node:node /home/node/app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /home/node/app/dist ./dist
-COPY --from=builder --chown=node:node /home/node/app/prisma ./prisma
+# Install OpenSSL (dibutuhkan Prisma runtime Debian)
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends openssl && \
+    rm -rf /var/lib/apt/lists/*
 
-# Bersihkan cache user node saja
-RUN rm -rf /home/node/.npm /home/node/.cache /tmp/*
+# Copy hasil build dari builder
+COPY --from=builder /home/node/app/package*.json ./
+COPY --from=builder /home/node/app/node_modules ./node_modules
+COPY --from=builder /home/node/app/dist ./dist
+COPY --from=builder /home/node/app/prisma ./prisma
 
-ENV NODE_OPTIONS="--max-old-space-size=128 --heapsnapshot-near-heap-limit=1"
+# Bersihkan cache
+RUN rm -rf /home/node/.npm /tmp/*
+
 EXPOSE 3000
 
+# Jalankan Prisma migrate deploy sebelum start NestJS
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
