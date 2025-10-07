@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import {
   ExceptionFilter,
   Catch,
@@ -8,40 +6,81 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { ValidationError } from 'class-validator';
+
+interface ErrorResponse {
+  status: 'error' | 'success';
+  message: string;
+  data: null;
+  errors: Record<string, string[]> | string[] | null;
+  meta: null;
+}
+
+interface HttpErrorBody {
+  message?: string | string[] | ValidationError[];
+  errors?: Record<string, string[]> | Record<string, string>;
+  [key: string]: unknown;
+}
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
-  catch(exception: unknown, host: ArgumentsHost) {
+  catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
-    let errors: Record<string, string> | null = null;
+    let errors: Record<string, string[]> | string[] | null = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
-      const res = exception.getResponse();
+      const exceptionResponse = exception.getResponse();
 
-      if (typeof res === 'string') {
-        message = res;
-      } else if (typeof res === 'object' && res !== null) {
-        const body = res as Record<string, any>;
-        message = body.message ?? message;
+      if (typeof exceptionResponse === 'string') {
+        message = exceptionResponse;
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
+        const body = exceptionResponse as HttpErrorBody;
+        message = typeof body.message === 'string' ? body.message : message;
 
-        // Jika structure memiliki "errors" sebagai object
+        // Handle explicit error object
         if (body.errors && typeof body.errors === 'object') {
-          errors = body.errors;
+          errors = Object.entries(body.errors).reduce<Record<string, string[]>>(
+            (acc, [key, val]) => {
+              const values = Array.isArray(val)
+                ? (val as string[])
+                : [String(val)];
+              acc[key] = values;
+              return acc;
+            },
+            {},
+          );
         }
 
-        // Jika message dari validation pipe berupa array
-        if (Array.isArray(body.message)) {
+        // Handle ValidationPipe array message (simple strings)
+        if (
+          Array.isArray(body.message) &&
+          typeof body.message[0] === 'string'
+        ) {
           message = 'Validation failed';
-          errors = Object.fromEntries(
-            body.message.map((msg: string, i: number) => [
-              `field_${i + 1}`,
-              msg,
-            ]),
+          errors = body.message as string[];
+        }
+
+        // Handle ValidationError[] from class-validator
+        if (
+          Array.isArray(body.message) &&
+          body.message[0] instanceof ValidationError
+        ) {
+          message = 'Validation failed';
+          const validationErrors = body.message as ValidationError[];
+          errors = validationErrors.reduce<Record<string, string[]>>(
+            (acc, err) => {
+              acc[err.property] = Object.values(err.constraints ?? {});
+              return acc;
+            },
+            {},
           );
         }
       }
@@ -49,12 +88,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exception.message;
     }
 
-    response.status(status).json({
-      status: 'error',
+    // Log error only in non-production
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[HttpExceptionFilter]', exception);
+    }
+
+    const errorResponse: ErrorResponse = {
+      status: status >= HttpStatus.BAD_REQUEST ? 'error' : 'success',
       message,
       data: null,
       errors,
       meta: null,
-    });
+    };
+
+    response.status(status).json(errorResponse);
   }
 }

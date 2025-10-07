@@ -1,34 +1,62 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Body, Controller, Post, Res, HttpCode } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { loginDto, refreshTokenDto } from './dto/login.dto';
+import { Response, Request } from 'express';
+import { RegisterDto } from './dto/register.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post()
-  create(@Body() createAuthDto: CreateAuthDto) {
-    return this.authService.create(createAuthDto);
+  @Post('register')
+  async register(@Body() body: RegisterDto) {
+    const user = await this.authService.register(body);
+    return { message: 'User registered successfully', data: user };
   }
 
-  @Get()
-  findAll() {
-    return this.authService.findAll();
+  @HttpCode(200)
+  @Post('login')
+  async login(
+    @Body() body: loginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const tokens = await this.authService.login(body);
+
+    res.cookie('refresh_token', tokens.refresh_token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return {
+      status: 'success',
+      message: 'Login berhasil',
+      data: { access_token: tokens.access_token },
+    };
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.authService.findOne(+id);
-  }
+  // REFRESH TOKEN
+  @HttpCode(200)
+  @Post('refresh-token')
+  async refreshToken(
+    @Body() body: refreshTokenDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = await this.authService.refreshToken(body);
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAuthDto: UpdateAuthDto) {
-    return this.authService.update(+id, updateAuthDto);
-  }
+    // Rotasi cookie refresh token (buat baru)
+    res.cookie('refresh_token', body.refresh_token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.authService.remove(+id);
+    return {
+      status: 'success',
+      message: 'Token diperbarui',
+      data: token,
+    };
   }
 }
