@@ -9,9 +9,10 @@ import {
   responseLoginDto,
   responseRefreshTokenDto,
 } from './dto/login.dto';
-import { users } from '@prisma/client';
 import { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
 import { RegisterDto, RegisterUserResponseDto } from './dto/register.dto';
+import { PasswordHelper } from '../common/helpers/password.helper';
+import { TokenHelper } from '../common/helpers/token.helper';
 
 @Injectable()
 export class AuthService {
@@ -26,7 +27,7 @@ export class AuthService {
   async register(registerDto: RegisterDto): Promise<RegisterUserResponseDto> {
     await this.validateUniqueFields(registerDto.email, registerDto.username);
 
-    const hashedPassword = await this.hashPassword(registerDto.password);
+    const hashedPassword = await PasswordHelper.hash(registerDto.password);
 
     return this.prisma.users.create({
       data: { ...registerDto, password: hashedPassword },
@@ -44,10 +45,19 @@ export class AuthService {
     if (!isPasswordValid)
       throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
 
-    const accessToken = await this.generateAccessToken(user);
-    const refreshToken = await this.generateRefreshToken(user);
+    const accessToken = await TokenHelper.generateAccessToken(
+      this.jwt,
+      this.config,
+      user,
+    );
+    const refreshToken = await TokenHelper.generateRefreshToken(
+      this.jwt,
+      this.config,
+      user,
+    );
 
-    const hashedRefresh = await bcrypt.hash(refreshToken, 10);
+    const hashedRefresh = await PasswordHelper.hash(refreshToken);
+
     await this.prisma.users.update({
       where: { id: user.id },
       data: { refresh_token: hashedRefresh },
@@ -79,21 +89,35 @@ export class AuthService {
           HttpStatus.UNAUTHORIZED,
         );
 
-      const isValid = await bcrypt.compare(refresh_token, user.refresh_token);
+      const isValid = await PasswordHelper.compare(
+        refresh_token,
+        user.refresh_token,
+      );
       if (!isValid)
         throw new HttpException(
           'Invalid refresh token',
           HttpStatus.UNAUTHORIZED,
         );
 
-      const newRefreshToken = await this.generateRefreshToken(user);
-      const hashedRefresh = await bcrypt.hash(newRefreshToken, 10);
+      const newRefreshToken = await TokenHelper.generateRefreshToken(
+        this.jwt,
+        this.config,
+        user,
+      );
+
+      const hashedRefresh = await PasswordHelper.hash(newRefreshToken);
+
       await this.prisma.users.update({
         where: { id: user.id },
         data: { refresh_token: hashedRefresh },
       });
 
-      const newAccessToken = await this.generateAccessToken(user);
+      const newAccessToken = await TokenHelper.generateAccessToken(
+        this.jwt,
+        this.config,
+        user,
+      );
+
       return { access_token: newAccessToken };
     } catch (err) {
       if (err instanceof TokenExpiredError)
@@ -118,22 +142,6 @@ export class AuthService {
     return { status: 'success', message: 'Logout berhasil' };
   }
 
-  private async generateAccessToken(user: users): Promise<string> {
-    const payload = { sub: user.id, username: user.username };
-    return this.jwt.signAsync(payload, {
-      secret: this.config.get<string>('JWT_ACCESS_SECRET'),
-      expiresIn: this.config.get<string>('JWT_ACCESS_EXPIRES'),
-    });
-  }
-
-  private async generateRefreshToken(user: users): Promise<string> {
-    const payload = { sub: user.id, username: user.username };
-    return this.jwt.signAsync(payload, {
-      secret: this.config.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRES'),
-    });
-  }
-
   private async validateUniqueFields(email: string, username: string) {
     const [emailExists, usernameExists] = await Promise.all([
       this.prisma.users.findUnique({ where: { email } }),
@@ -152,9 +160,5 @@ export class AuthService {
         HttpStatus.BAD_REQUEST,
       );
     }
-  }
-
-  private async hashPassword(password: string): Promise<string> {
-    return bcrypt.hash(password, this.BCRYPT_ROUNDS);
   }
 }
