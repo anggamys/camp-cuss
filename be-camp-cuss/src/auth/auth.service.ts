@@ -16,8 +16,6 @@ import { TokenHelper } from '../common/helpers/token.helper';
 
 @Injectable()
 export class AuthService {
-  private readonly BCRYPT_ROUNDS = 10;
-
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
@@ -139,6 +137,7 @@ export class AuthService {
       where: { id: userId },
       data: { refresh_token: null },
     });
+
     return { status: 'success', message: 'Logout berhasil' };
   }
 

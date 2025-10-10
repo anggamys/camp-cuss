@@ -8,7 +8,7 @@ export class TokenHelper {
     config: ConfigService,
     user: users,
   ): Promise<string> {
-    const payload = { sub: user.id, username: user.username };
+    const payload = { ...user, sub: user.id };
     return jwt.signAsync(payload, {
       secret: config.get<string>('JWT_ACCESS_SECRET'),
       expiresIn: config.get<string>('JWT_ACCESS_EXPIRES'),
@@ -20,7 +20,7 @@ export class TokenHelper {
     config: ConfigService,
     user: users,
   ): Promise<string> {
-    const payload = { sub: user.id, username: user.username };
+    const payload = { ...user, sub: user.id };
     return jwt.signAsync(payload, {
       secret: config.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: config.get<string>('JWT_REFRESH_EXPIRES'),
