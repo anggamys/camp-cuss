@@ -1,57 +1,69 @@
 import { IsEmail, IsString, IsOptional, IsEnum } from 'class-validator';
 import { Role } from '@prisma/client';
+import { IsInt } from 'class-validator';
 
 export class UpdateUserDto {
-  @IsString()
+  @IsString({ message: 'Username harus berupa string' })
   @IsOptional()
   username?: string;
 
-  @IsEmail()
+  @IsEmail({}, { message: 'Email tidak valid' })
   @IsOptional()
   email?: string;
 
-  @IsString()
+  @IsString({ message: 'Password harus berupa string' })
   @IsOptional()
   password?: string;
 
-  @IsString()
+  @IsString({ message: 'NPM harus berupa string' })
   @IsOptional()
   npm?: string;
 
-  @IsString()
+  @IsString({ message: 'Nomor telepon harus berupa string' })
   @IsOptional()
   no_phone?: string;
 
-  @IsEnum(Role)
+  @IsEnum(Role, { message: 'Role tidak valid' })
   @IsOptional()
   role?: Role;
 
-  @IsString()
+  @IsString({ message: 'KTM harus berupa string' })
   @IsOptional()
   ktm?: string;
 
-  @IsString()
+  @IsString({ message: 'KTP harus berupa string' })
   @IsOptional()
   ktp?: string;
 
-  @IsString()
+  @IsString({ message: 'SIM harus berupa string' })
   @IsOptional()
   sim?: string;
 
-  @IsString()
+  @IsString({ message: 'Foto profil harus berupa string' })
   @IsOptional()
   photo_profile?: string;
 
-  @IsString()
+  @IsString({ message: 'Refresh token harus berupa string' })
   @IsOptional()
   refresh_token?: string;
 }
 
 export class UpdateUserResponseDto {
+  @IsInt({ message: 'Id harus berupa angka' })
   id: number;
+
+  @IsString({ message: 'Username harus berupa string' })
   username: string;
+
+  @IsEmail({}, { message: 'Email tidak valid' })
   email: string;
+
+  @IsString({ message: 'NPM harus berupa string' })
   npm: string;
+
+  @IsString({ message: 'Nomor telepon harus berupa string' })
   no_phone: string;
+
+  @IsEnum(Role, { message: 'Role tidak valid' })
   role: Role;
 }

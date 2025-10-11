@@ -38,8 +38,8 @@ export class UsersService {
 
     if (users.length === 0) {
       this.throwNotFound(
-        'No users found',
-        'No users available in the database',
+        'Tidak ada pengguna',
+        'Tidak ada pengguna di database',
       );
     }
 
@@ -53,7 +53,10 @@ export class UsersService {
     });
 
     if (!user) {
-      this.throwNotFound('User not found', 'No user with the given ID exists');
+      this.throwNotFound(
+        'Pengguna tidak ditemukan',
+        'Tidak ada pengguna dengan ID yang diberikan',
+      );
     }
 
     return user;
@@ -88,7 +91,10 @@ export class UsersService {
   private async findUserById(id: number) {
     const user = await this.prisma.users.findUnique({ where: { id } });
     if (!user) {
-      this.throwNotFound('User not found', 'No user with the given ID exists');
+      this.throwNotFound(
+        'Pengguna tidak ditemukan',
+        'Tidak ada pengguna dengan ID yang diberikan',
+      );
     }
     return user;
   }
@@ -102,10 +108,12 @@ export class UsersService {
     if (emailExists || usernameExists) {
       throw new HttpException(
         {
-          message: 'Validation failed',
+          message: 'Validasi gagal',
           errors: {
-            email: emailExists ? 'Email already used' : undefined,
-            username: usernameExists ? 'Username already used' : undefined,
+            email: emailExists ? 'Email sudah digunakan' : undefined,
+            username: usernameExists
+              ? 'Nama pengguna sudah digunakan'
+              : undefined,
           },
         },
         HttpStatus.BAD_REQUEST,
@@ -140,14 +148,19 @@ export class UsersService {
       const conflicts = results.filter((result) => result.exists);
 
       if (conflicts.length > 0) {
+        const fieldLabels: Record<string, string> = {
+          email: 'Email',
+          username: 'Nama pengguna',
+        };
+
         const errors = conflicts.reduce((acc, conflict) => {
-          acc[conflict.field] =
-            `${conflict.field.charAt(0).toUpperCase() + conflict.field.slice(1)} already used`;
+          const label = fieldLabels[conflict.field] || conflict.field;
+          acc[conflict.field] = `${label} sudah digunakan`;
           return acc;
         }, {});
 
         throw new HttpException(
-          { message: 'Validation failed', errors },
+          { message: 'Validasi gagal', errors },
           HttpStatus.BAD_REQUEST,
         );
       }
