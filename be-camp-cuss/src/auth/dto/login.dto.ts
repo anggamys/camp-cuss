@@ -1,33 +1,33 @@
 import { IsString, IsNotEmpty } from 'class-validator';
 
 export class loginDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Username harus berupa string' })
+  @IsNotEmpty({ message: 'Username tidak boleh kosong' })
   username: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Password harus berupa string' })
+  @IsNotEmpty({ message: 'Password tidak boleh kosong' })
   password: string;
 }
 
 export class responseLoginDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Access token harus berupa string' })
+  @IsNotEmpty({ message: 'Access token tidak boleh kosong' })
   access_token: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Refresh token harus berupa string' })
+  @IsNotEmpty({ message: 'Refresh token tidak boleh kosong' })
   refresh_token: string;
 }
 
 export class refreshTokenDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Refresh token harus berupa string' })
+  @IsNotEmpty({ message: 'Refresh token tidak boleh kosong' })
   refresh_token: string;
 }
 
 export class responseRefreshTokenDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Access token harus berupa string' })
+  @IsNotEmpty({ message: 'Access token tidak boleh kosong' })
   access_token: string;
 }

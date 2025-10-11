@@ -37,11 +37,15 @@ export class AuthService {
     const { username, password } = loginDto;
 
     const user = await this.prisma.users.findUnique({ where: { username } });
-    if (!user) throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    if (!user)
+      throw new HttpException('Pengguna tidak ditemukan', HttpStatus.NOT_FOUND);
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid)
-      throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        'Kredensial tidak valid',
+        HttpStatus.UNAUTHORIZED,
+      );
 
     const accessToken = await TokenHelper.generateAccessToken(
       this.jwt,
@@ -83,7 +87,7 @@ export class AuthService {
       });
       if (!user || !user.refresh_token)
         throw new HttpException(
-          'Refresh token not found',
+          'Refresh token tidak ditemukan',
           HttpStatus.UNAUTHORIZED,
         );
 
@@ -93,7 +97,7 @@ export class AuthService {
       );
       if (!isValid)
         throw new HttpException(
-          'Invalid refresh token',
+          'Refresh token tidak valid',
           HttpStatus.UNAUTHORIZED,
         );
 
@@ -120,15 +124,15 @@ export class AuthService {
     } catch (err) {
       if (err instanceof TokenExpiredError)
         throw new HttpException(
-          'Refresh token expired',
+          'Refresh token telah kedaluwarsa',
           HttpStatus.UNAUTHORIZED,
         );
       if (err instanceof JsonWebTokenError)
         throw new HttpException(
-          'Invalid refresh token',
+          'Refresh token tidak valid',
           HttpStatus.UNAUTHORIZED,
         );
-      throw new HttpException('Auth error', HttpStatus.UNAUTHORIZED);
+      throw new HttpException('Kesalahan otentikasi', HttpStatus.UNAUTHORIZED);
     }
   }
 
@@ -138,7 +142,7 @@ export class AuthService {
       data: { refresh_token: null },
     });
 
-    return { status: 'success', message: 'Logout berhasil' };
+    return { status: 'sukses', message: 'Logout berhasil' };
   }
 
   private async validateUniqueFields(email: string, username: string) {
@@ -150,10 +154,10 @@ export class AuthService {
     if (emailExists || usernameExists) {
       throw new HttpException(
         {
-          message: 'Validation failed',
+          message: 'Validasi gagal',
           errors: {
-            email: emailExists ? 'Email already used' : undefined,
-            username: usernameExists ? 'Username already used' : undefined,
+            email: emailExists ? 'Email sudah digunakan' : undefined,
+            username: usernameExists ? 'Username sudah digunakan' : undefined,
           },
         },
         HttpStatus.BAD_REQUEST,

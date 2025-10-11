@@ -8,56 +8,56 @@ import {
 import { Role } from '@prisma/client';
 
 export class CreateUserDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Username harus berupa string' })
+  @IsNotEmpty({ message: 'Username tidak boleh kosong' })
   username: string;
 
-  @IsEmail()
-  @IsNotEmpty()
+  @IsEmail({}, { message: 'Email tidak valid' })
+  @IsNotEmpty({ message: 'Email tidak boleh kosong' })
   email: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Password harus berupa string' })
+  @IsNotEmpty({ message: 'Password tidak boleh kosong' })
   password: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'NPM harus berupa string' })
+  @IsNotEmpty({ message: 'NPM tidak boleh kosong' })
   npm: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'Nomor telepon harus berupa string' })
+  @IsNotEmpty({ message: 'Nomor telepon tidak boleh kosong' })
   no_phone: string;
 
-  @IsEnum(Role)
+  @IsEnum(Role, { message: 'Role tidak valid' })
   @IsOptional()
   role: Role;
 
-  @IsString()
+  @IsString({ message: 'KTM harus berupa string' })
   @IsOptional()
   ktm?: string;
 
-  @IsString()
+  @IsString({ message: 'KTP harus berupa string' })
   @IsOptional()
   ktp?: string;
 
-  @IsString()
+  @IsString({ message: 'SIM harus berupa string' })
   @IsOptional()
   sim?: string;
 
-  @IsString()
+  @IsString({ message: 'Foto profil harus berupa string' })
   @IsOptional()
   photo_profile?: string;
 
-  @IsString()
+  @IsString({ message: 'Refresh token harus berupa string' })
   @IsOptional()
   refresh_token?: string;
 }
 
 export class CreateUserResponseDto {
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Id tidak boleh kosong' })
   id: number;
 
-  @IsEmail()
-  @IsNotEmpty()
+  @IsEmail({}, { message: 'Email tidak valid' })
+  @IsNotEmpty({ message: 'Email tidak boleh kosong' })
   email: string;
 }

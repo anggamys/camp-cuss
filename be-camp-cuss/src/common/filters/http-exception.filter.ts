@@ -12,7 +12,7 @@ interface ErrorResponse {
   status: 'error' | 'success';
   message: string;
   data: null;
-  errors: Record<string, string[]> | string[] | null;
+  errors: Record<string, string[]> | null;
   meta: null;
 }
 
@@ -30,7 +30,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
-    let errors: Record<string, string[]> | string[] | null = null;
+    let errors: Record<string, string[]> | null = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -43,14 +43,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
         exceptionResponse !== null
       ) {
         const body = exceptionResponse as HttpErrorBody;
-        message = typeof body.message === 'string' ? body.message : message;
 
-        // Handle explicit error object
+        // Ambil pesan utama
+        if (typeof body.message === 'string') {
+          message = body.message;
+        }
+
+        // Format error hasil ValidationPipe
         if (body.errors && typeof body.errors === 'object') {
           errors = Object.entries(body.errors).reduce<Record<string, string[]>>(
             (acc, [key, val]) => {
-              const values = Array.isArray(val)
-                ? (val as string[])
+              if (val === undefined || val === null) return acc;
+              const values: string[] = Array.isArray(val)
+                ? (val as string[]).map((v) => String(v))
                 : [String(val)];
               acc[key] = values;
               return acc;
@@ -59,16 +64,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
           );
         }
 
-        // Handle ValidationPipe array message (simple strings)
-        if (
-          Array.isArray(body.message) &&
-          typeof body.message[0] === 'string'
-        ) {
-          message = 'Validation failed';
-          errors = body.message as string[];
-        }
-
-        // Handle ValidationError[] from class-validator
+        // Fallback: handle ValidationError[] (misal belum diubah di ValidationPipe)
         if (
           Array.isArray(body.message) &&
           body.message[0] instanceof ValidationError
@@ -88,9 +84,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exception.message;
     }
 
-    // Log error only in non-production
+    // Logging ringkas di console dev
     if (process.env.NODE_ENV !== 'production') {
-      console.error('[HttpExceptionFilter]', exception);
+      const exceptionName =
+        exception instanceof Error
+          ? exception.constructor.name
+          : typeof exception;
+      console.error(
+        `[HttpExceptionFilter] ${exceptionName}: ${message}`,
+        errors ? JSON.stringify(errors, null, 2) : '',
+      );
     }
 
     const errorResponse: ErrorResponse = {
