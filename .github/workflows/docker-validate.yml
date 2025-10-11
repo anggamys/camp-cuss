@@ -5,11 +5,13 @@ on:
     branches:
       - main
     paths:
+      - '.github/workflows/**'
       - 'be-camp-cuss/**'
   pull_request:
     branches:
       - main
     paths:
+      - '.github/workflows/**'
       - 'be-camp-cuss/**'
 
 jobs:
