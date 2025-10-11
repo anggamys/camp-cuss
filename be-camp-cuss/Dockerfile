@@ -1,22 +1,29 @@
-FROM node:22-alpine AS builder
+FROM node:22-alpine
 WORKDIR /app
-ENV TZ=Asia/Jakarta
+ENV TZ=Asia/Jakarta PORT=3000
 
+# Install system dependencies
 RUN apk add --no-cache openssl
+
+# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --prefer-offline
+
+# Copy source code
 COPY . .
+
+# Generate Prisma client and build NestJS
 RUN npx prisma generate --schema=./prisma/schema.prisma
-RUN npm run build && npm prune --omit=dev
+RUN npm run build
 
-FROM node:22-alpine AS runtime
-WORKDIR /app
-ENV NODE_ENV=production TZ=Asia/Jakarta PORT=3000
+# Switch to production
+ENV NODE_ENV=production
 
-RUN apk add --no-cache openssl
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package*.json ./
+# Remove dev dependencies
+RUN npm prune --omit=dev
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+# Expose port
+EXPOSE 3000
+
+# Run migrations and start app
+CMD ["sh", "-c", "npx prisma migrate deploy && ls dist && node dist/main.js"]
