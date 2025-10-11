@@ -3,5 +3,6 @@ node_modules
 .gitignore
 Dockerfile
 .dockerignore
+dist
 .env
 README.md
