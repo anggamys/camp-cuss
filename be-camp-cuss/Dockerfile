@@ -7,9 +7,7 @@ COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --prefer-offline
 COPY . .
 RUN npx prisma generate --schema=./prisma/schema.prisma
-RUN npm run build
-RUN npm prune --omit=dev
-
+RUN npm run build && npm prune --omit=dev
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
@@ -21,4 +19,4 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package*.json ./
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run seed:prod && npm run start:prod"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run seed:prod && node dist/main.js"]
