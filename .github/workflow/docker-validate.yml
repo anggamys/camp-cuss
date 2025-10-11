@@ -1,0 +1,68 @@
+name: Validate Backend Docker Build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'be-camp-cuss/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'be-camp-cuss/**'
+
+jobs:
+  validate-docker:
+    name: Validate Docker Build (be-camp-cuss)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: be-camp-cuss
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('be-camp-cuss/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit
+
+      - name: Check TypeScript build
+        run: npm run build
+
+      - name: Validate Docker build
+        run: docker build --no-cache -t be-camp-cuss .
+
+  auto-merge:
+    name: Merge main → staging (if backend build passes)
+    needs: validate-docker
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Merge main into staging
+        run: |
+          git fetch origin
+          git checkout staging
+          git merge origin/main --no-edit || true
+          git push origin staging
