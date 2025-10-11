@@ -50,10 +50,12 @@ jobs:
     name: Merge main → staging (if backend build passes)
     needs: validate-docker
     runs-on: ubuntu-latest
-    if: success()
+    if: ${{ success() }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # penting supaya semua branch bisa diakses
 
       - name: Configure Git
         run: |
@@ -64,5 +66,5 @@ jobs:
         run: |
           git fetch origin
           git checkout staging
-          git merge origin/main --no-edit || true
+          git merge origin/main --no-edit
           git push origin staging
