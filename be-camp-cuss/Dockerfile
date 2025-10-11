@@ -7,7 +7,9 @@ COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --prefer-offline
 COPY . .
 RUN npx prisma generate --schema=./prisma/schema.prisma
-RUN npm run build && npm prune --omit=dev
+RUN npm run build
+RUN npm prune --omit=dev
+
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
