@@ -1,23 +1,25 @@
 FROM node:22-alpine
 WORKDIR /app
-ENV NODE_ENV=production TZ=Asia/Jakarta PORT=3000
+ENV TZ=Asia/Jakarta PORT=3000
 
-# Install required package
 RUN apk add --no-cache openssl
 
-# Copy package info & install dependencies (termasuk dev)
+# Copy dan install dependency (termasuk dev)
 COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --prefer-offline
 
-# Copy project files
+# Copy source
 COPY . .
 
-# Generate Prisma Client & build NestJS
+# Generate Prisma Client dan build NestJS
 RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
 
-# Hapus devDependencies setelah build selesai
+# Baru sekarang set environment production
+ENV NODE_ENV=production
+
+# Hapus devDependencies agar image kecil
 RUN npm prune --omit=dev
 
-# Jalankan migration & aplikasi
-CMD sh -c "npx prisma migrate deploy && node dist/main.js"
+# Jalankan migrate dan start
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
