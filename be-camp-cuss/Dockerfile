@@ -1,34 +1,20 @@
-# ===== STAGE 1: BUILD =====
-FROM node:22-alpine AS builder
+FROM node:22-alpine
 WORKDIR /app
-ENV TZ=Asia/Jakarta
+ENV NODE_ENV=production TZ=Asia/Jakarta PORT=3000
 
 # Install dependencies
 RUN apk add --no-cache openssl
+
+# Copy package info and install
 COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --prefer-offline
 
-# Copy source and build
+# Copy source code
 COPY . .
+
+# Generate Prisma client and build
 RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
-RUN npm prune --omit=dev
 
-
-# ===== STAGE 2: RUNTIME =====
-FROM node:22-alpine AS runtime
-WORKDIR /app
-ENV NODE_ENV=production \
-    TZ=Asia/Jakarta \
-    PORT=3000
-
-RUN apk add --no-cache openssl
-
-# Copy built assets
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package*.json ./
-
-# Jalankan migration dan start server
+# Jalankan migration dan app
 CMD sh -c "npx prisma migrate deploy && node dist/main.js"
