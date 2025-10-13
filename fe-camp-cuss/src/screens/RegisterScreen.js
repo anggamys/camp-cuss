@@ -1,6 +1,6 @@
 // screens/RegisterScreen.js
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -19,28 +19,37 @@ import FloatingInput from '../components/FloatingInput';
 
 export default function RegisterScreen() {
   const navigation = useNavigation();
-  const { register } = useAuth();
+  const { register, error, setError } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [npm, setNpm] = useState('');
   const [noPhone, setNoPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, setError]);
+
   const handleRegister = async () => {
     if (!username || !email || !password || !npm || !noPhone) {
-      Alert.alert('Error', 'Semua field wajib diisi!');
-      return;
+      return setError('Semua form input wajib diisi!');
+    }
+
+    if (confirmPassword !== password) {
+      return setError('Konfirmasi password salah.')
     }
 
     setLoading(true);
     try {
-      const response = await register(username, email, password, npm, noPhone);
+      await register(username, email, password, npm, noPhone);
       Alert.alert('Berhasil!', 'Akun berhasil dibuat.', [
         { text: 'OK', onPress: () => navigation.navigate('Login') },
       ]);
-    } catch (error) {
-      Alert.alert('Gagal', error.message || 'Terjadi kesalahan saat pendaftaran.');
     } finally {
       setLoading(false);
     }
@@ -68,6 +77,8 @@ export default function RegisterScreen() {
               resizeMode="contain"
             />
 
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
             <FloatingInput
               label="Username"
               value={username}
@@ -87,6 +98,13 @@ export default function RegisterScreen() {
               label="Password"
               value={password}
               onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            <FloatingInput
+              label="Confirm Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
               secureTextEntry
             />
 
@@ -149,6 +167,16 @@ const styles = StyleSheet.create({
     width: 300,
     height: 100,
     alignSelf: 'center',
+  },
+  errorText: {
+    color: '#FF6B6B',
+    backgroundColor: 'rgba(255, 107, 107, 0.15)',
+    textAlign: 'center',
+    paddingVertical: 8,
+    marginBottom: 20,
+    borderRadius: 8,
+    fontSize: 14,
+    fontWeight: '500',
   },
   button: {
     backgroundColor: '#F9F1E2',

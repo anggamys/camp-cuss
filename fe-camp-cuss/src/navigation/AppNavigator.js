@@ -1,8 +1,7 @@
 // src/navigation/AppNavigator.js
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useAuth } from '../hooks/useAuth'; // 👈 import useAuth
-import { useNavigation } from "@react-navigation/native";
+import { useAuth } from '../hooks/useAuth';
 
 // Screens
 import SplashScreen from '../screens/SplashScreen';
@@ -12,24 +11,29 @@ import RegisterScreen from '../screens/RegisterScreen';
 import HomeUser from '../screens/HomeUser';
 import HomeAdmin from '../screens/HomeAdmin';
 import HomeDriver from '../screens/HomeDriver';
+import SearchScreen from '../screens/SearchScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
 // Stack untuk pengguna yang sudah login
 const AppStack = () => {
   const { user } = useAuth();
-  const {navigate} = useNavigation();
 
+  let navigateName = "";
   // Tentukan home screen berdasarkan role
-  if (user?.role === 'admin') navigate.replace = 'HomeAdmin';
-  else if (user?.role === 'driver') navigate.replace = 'HomeDriver';
-  else navigate.replace = 'HomeUser';
+  if (user.role === 'admin') navigateName = 'HomeAdmin';
+  else if (user.role === 'driver') navigateName = 'HomeDriver';
+  else if (user.role === 'customer') navigateName = 'HomeUser';
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={navigateName}>
       <Stack.Screen name="HomeUser" component={HomeUser} />
       <Stack.Screen name="HomeAdmin" component={HomeAdmin} />
       <Stack.Screen name="HomeDriver" component={HomeDriver} />
+
+      <Stack.Screen name="Search" component={SearchScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
     </Stack.Navigator>
   );
 };

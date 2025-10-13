@@ -9,98 +9,94 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
+import BottomNav from '../components/BottomNav';
 
 const HomeUser = () => {
-  const { user, logout } = useAuth(); // Ambil nama user dari context
+  const { user } = useAuth(); // Ambil nama user dari context
 
   // Data dummy untuk rekomendasi tujuan
   const destinations = [
     {
       id: 1,
-      name: "Danau UPI Jatinangor",
+      name: 'Danau UPI Jatinangor',
       image: require('../assets/danau.png'),
-      description: "Tempat favorit mahasiswa untuk refreshing"
+      description: 'Tempat favorit mahasiswa untuk refreshing',
     },
     {
-      id: 2,  
-      name: "Fakultas Komputer",
+      id: 2,
+      name: 'Fakultas Komputer',
       image: require('../assets/fakultas.jpg'),
-      description: "Kampus modern dengan fasilitas lengkap"
+      description: 'Kampus modern dengan fasilitas lengkap',
     },
     {
       id: 3,
-      name: "Gedung Rektorat",
+      name: 'Gedung Rektorat',
       image: require('../assets/rektorat.jpg'),
-      description: "Pusat administrasi kampus"
+      description: 'Pusat administrasi kampus',
     },
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, {user?.username || 'User'} 👋</Text>
-        <TouchableOpacity style={styles.notificationIcon}>
-          <Image source={require('../assets/bell.png')} style={styles.icon} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Background Image */}
-      <Image
-        source={require('../assets/background-home.jpg')}
-        style={styles.background}
-        resizeMode="cover"
-      />
-
-      {/* Search Box */}
-      <View style={styles.searchBox}>
-        <Text style={styles.searchTitle}>Mau ke sebelah mana hari ini?</Text>
-        <View style={styles.searchInput}>
-          <Image source={require('../assets/search.png')} style={styles.searchIcon} />
-          <Text style={styles.searchPlaceholder}>Cari lokasi mu</Text>
-        </View>
-      </View>
-
-      {/* Recommendations */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>Rekomendasi Tujuan di UPI Jatinangor</Text>
-
-        <View style={styles.grid}>
-          {destinations.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.card}>
-              <Image source={item.image} style={styles.cardImage} />
-              <Text style={styles.cardTitle}>{item.name}</Text>
-              <Text style={styles.cardDesc}>{item.description}</Text>
-            </TouchableOpacity>
-          ))}
+    <>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.greeting}>
+            Hello, {user?.username || 'User'} 👋
+          </Text>
+          <TouchableOpacity style={styles.notificationIcon}>
+            <Image source={require('../assets/bell.png')} style={styles.icon} />
+          </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Ini nih tujuan yang bisa kamu tuju</Text>
+        {/* Background Image */}
         <Image
-          source={require('../assets/banner.jpg')}
-          style={styles.banner}
+          source={require('../assets/background-home.jpg')}
+          style={styles.background}
           resizeMode="cover"
         />
-      </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Image source={require('../assets/home-active.png')} style={styles.navIcon} />
-          <Text style={[styles.navText, styles.navTextActive]}>Home</Text>
-        </TouchableOpacity>
+        {/* Search Box */}
+        <View style={styles.searchBox}>
+          <Text style={styles.searchTitle}>Mau ke sebelah mana hari ini?</Text>
+          <View style={styles.searchInput}>
+            <Image
+              source={require('../assets/search.png')}
+              style={styles.searchIcon}
+            />
+            <Text style={styles.searchPlaceholder}>Cari lokasi mu</Text>
+          </View>
+        </View>
 
-        <TouchableOpacity style={styles.navItem}>
-          <Image source={require('../assets/search.png')} style={styles.navIcon} />
-          <Text style={styles.navText}>Search</Text>
-        </TouchableOpacity>
+        {/* Recommendations */}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <Text style={styles.sectionTitle}>
+            Rekomendasi Tujuan di UPI Jatinangor
+          </Text>
 
-        <TouchableOpacity style={styles.navItem} onPress={logout}>
-          <Image source={require('../assets/profile.png')} style={styles.navIcon} />
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          <View style={styles.grid}>
+            {destinations.map(item => (
+              <TouchableOpacity key={item.id} style={styles.card}>
+                <Image source={item.image} style={styles.cardImage} />
+                <Text style={styles.cardTitle}>{item.name}</Text>
+                <Text style={styles.cardDesc}>{item.description}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.sectionTitle}>
+            Ini nih tujuan yang bisa kamu tuju
+          </Text>
+          <Image
+            source={require('../assets/banner.jpg')}
+            style={styles.banner}
+            resizeMode="cover"
+          />
+        </ScrollView>
+      </SafeAreaView>
+
+      <BottomNav activeScreen="Home" />
+    </>
   );
 };
 
