@@ -31,6 +31,17 @@ model users {
   updated_at     DateTime  @updatedAt
 }
 
+model destinations {
+  id           Int      @id @default(autoincrement())
+  name         String
+  image_place  String
+  latitude     Float
+  longitude    Float
+  estimated    Int
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+}
+
 enum Role {
   customer
   driver
