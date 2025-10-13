@@ -1,29 +1,10 @@
 // src/context/AuthProvider.js
 import React, { createContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import { loginApi, registerApi, refreshTokenApi } from '../api/authApi';
+import {saveTokens, getTokens, removeTokens} from '../utils/tokenStorage';
 
 export const AuthContext = createContext();
-
-// Helper: Simpan token ke AsyncStorage
-const saveTokens = async (accessToken, refreshToken) => {
-  await AsyncStorage.setItem('accessToken', accessToken);
-  await AsyncStorage.setItem('refreshToken', refreshToken);
-};
-
-// Helper: Ambil token
-const getTokens = async () => {
-  const accessToken = await AsyncStorage.getItem('accessToken');
-  const refreshToken = await AsyncStorage.getItem('refreshToken');
-  return { accessToken, refreshToken };
-};
-
-// Helper: Hapus token
-const removeTokens = async () => {
-  await AsyncStorage.removeItem('accessToken');
-  await AsyncStorage.removeItem('refreshToken');
-};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -100,7 +81,6 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     await removeTokens();
     setUser(null);
-    // Navigasi di-handle di luar AuthProvider
   };
 
   return (
