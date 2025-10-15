@@ -4,13 +4,15 @@ import {
   getRefreshToken,
   saveTokens,
   removeTokens,
-} from '../utils/storage';
+} from '../utils/tokenStorage';
+import jwtDecode from 'jwt-decode';
+
+const API_URL = 'https://radical-shay-sandboxdevlab-4db51ee1.koyeb.app/v1';
 
 const api = axios.create({
-  baseURL: 'https:/https://radical-shay-sandboxdevlab-4db51ee1.koyeb.app/v1',
+  baseURL: API_URL,
 });
 
-// Flag untuk mencegah multiple refresh
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -25,7 +27,6 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Interceptor Request: Tambahkan access token
 api.interceptors.request.use(
   async config => {
     const token = await getAccessToken();
@@ -37,7 +38,6 @@ api.interceptors.request.use(
   error => Promise.reject(error),
 );
 
-// Interceptor Response: Tangani 401
 api.interceptors.response.use(
   response => response,
   async error => {
@@ -45,7 +45,6 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
-        // Tunggu refresh selesai, lalu ulang request
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
@@ -61,7 +60,7 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = await getRefreshToken();
-        if (!refreshToken) throw new Error('No refresh token');
+        if (!refreshToken) throw new Error('Tidak ada token penyegaran');
 
         const now = Date.now() / 1000;
         const decoded = jwtDecode(refreshToken);
@@ -72,7 +71,6 @@ api.interceptors.response.use(
           return;
         }
 
-        // Panggil endpoint refresh
         const response = await axios.post(`${API_URL}/auth/refresh`, {
           refresh_token: refreshToken,
         });
@@ -83,15 +81,13 @@ api.interceptors.response.use(
         isRefreshing = false;
         processQueue(null, access_token);
 
-        // Ulang request asli
         originalRequest.headers.Authorization = `Bearer ${access_token}`;
         return api(originalRequest);
       } catch (refreshError) {
         isRefreshing = false;
         processQueue(refreshError, null);
         await removeTokens();
-        // Arahkan ke login (opsional: lewat event emitter atau context)
-        // Misal: navigationRef.current?.navigate('Login');
+        navigationRef.current?.navigate('Auth');
         return Promise.reject(refreshError);
       }
     }
