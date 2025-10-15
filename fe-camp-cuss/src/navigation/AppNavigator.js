@@ -11,7 +11,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 import HomeUser from '../screens/HomeUser';
 import HomeAdmin from '../screens/HomeAdmin';
 import HomeDriver from '../screens/HomeDriver';
-import SearchScreen from '../screens/SearchScreen';
+import StoryScreen from '../screens/StoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
@@ -20,19 +20,22 @@ const Stack = createNativeStackNavigator();
 const AppStack = () => {
   const { user } = useAuth();
 
-  let navigateName = "";
+  let navigateName = '';
   // Tentukan home screen berdasarkan role
   if (user.role === 'admin') navigateName = 'HomeAdmin';
   else if (user.role === 'driver') navigateName = 'HomeDriver';
   else if (user.role === 'customer') navigateName = 'HomeUser';
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={navigateName}>
+    <Stack.Navigator
+      screenOptions={{ headerShown: false, animation: 'none' }}
+      initialRouteName={navigateName}
+    >
       <Stack.Screen name="HomeUser" component={HomeUser} />
       <Stack.Screen name="HomeAdmin" component={HomeAdmin} />
       <Stack.Screen name="HomeDriver" component={HomeDriver} />
 
-      <Stack.Screen name="Search" component={SearchScreen} />
+      <Stack.Screen name="History" component={StoryScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
     </Stack.Navigator>
   );
@@ -40,7 +43,10 @@ const AppStack = () => {
 
 // Stack untuk auth (belum login)
 const AuthStack = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName='Splash'>
+  <Stack.Navigator
+    screenOptions={{ headerShown: false }}
+    initialRouteName="Splash"
+  >
     <Stack.Screen name="Splash" component={SplashScreen} />
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />

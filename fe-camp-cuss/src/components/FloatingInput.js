@@ -18,6 +18,8 @@ const FloatingInput = ({
   keyboardType = 'default',
   autoCapitalize = 'none',
   isPassword = false,
+  editable = true,
+  selectTextOnFocus = true,
   ...props
 }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -69,6 +71,8 @@ const FloatingInput = ({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         placeholderTextColor={placeholderTextColor}
+        editable={editable}
+        selectTextOnFocus={selectTextOnFocus}
         {...props}
       />
     </View>
