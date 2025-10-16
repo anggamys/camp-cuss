@@ -73,7 +73,7 @@ export default function ProfileScreen() {
             />
             <FloatingInput
               label="Password"
-              value={profile?.password || '********'}
+              value={'********'}
               editable={false}
               selectTextOnFocus={false}
             />

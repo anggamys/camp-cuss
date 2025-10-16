@@ -7,11 +7,13 @@ import {
   Animated,
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
+import { useSideBar } from '../hooks/useSideBar';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconDriver from 'react-native-vector-icons/FontAwesome';
 
 export default function Sidebar({ visible, onClose }) {
   const { user, logout } = useAuth();
+  const { goToEditProfile, goToLoginDriver } = useSideBar();
   const slideAnim = new Animated.Value(visible ? 0 : -300);
 
   React.useEffect(() => {
@@ -38,13 +40,13 @@ export default function Sidebar({ visible, onClose }) {
         <MenuItem label="Log Out" onPress={logout}>
           <Icon name="logout" size={24} style={styles.icon} />
         </MenuItem>
-        <MenuItem label="Edit Akun" onPress={() => console.log('Edit Akun')}>
+        <MenuItem label="Edit Akun" onPress={goToEditProfile}>
           <Icon name="edit-note" size={28} style={styles.icon} />
         </MenuItem>
         {user.role === 'customer' && (
           <MenuItem
             label="Login driver"
-            onPress={() => console.log('Login driver')}
+            onPress={goToLoginDriver}
           >
             <IconDriver name="drivers-license-o" size={20} style={styles.icon} />
           </MenuItem>
