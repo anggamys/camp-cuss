@@ -13,6 +13,8 @@ import HomeAdmin from '../screens/HomeAdmin';
 import HomeDriver from '../screens/HomeDriver';
 import StoryScreen from '../screens/StoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import LoginDriverScreen from '../screens/LoginDriverScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -37,6 +39,8 @@ const AppStack = () => {
 
       <Stack.Screen name="History" component={StoryScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="LoginDriver" component={LoginDriverScreen} />
     </Stack.Navigator>
   );
 };
