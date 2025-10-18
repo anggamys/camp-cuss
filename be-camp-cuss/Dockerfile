@@ -25,5 +25,5 @@ RUN npm prune --omit=dev
 # Expose port
 EXPOSE 3000
 
-# Run migrations and start app
-CMD ["sh", "-c", "npx prisma migrate deploy && ls dist && node dist/main.js"]
+# Start the application
+CMD ["sh", "-c", "node dist/main.js"]
