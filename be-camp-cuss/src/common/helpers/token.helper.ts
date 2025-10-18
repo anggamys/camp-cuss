@@ -10,6 +10,7 @@ interface JwtPayload {
 }
 
 export class TokenHelper {
+  // Bangun payload JWT
   private static buildPayload(user: users): JwtPayload {
     return {
       sub: user.id,
@@ -19,21 +20,28 @@ export class TokenHelper {
     };
   }
 
+  // Pastikan environment numeric (detik)
   private static getRequiredNumber(config: ConfigService, key: string): number {
-    const value = config.get<number>(key);
-    if (value === undefined || value === null || isNaN(value))
+    const raw = config.get<string>(key);
+    if (!raw) throw new Error(`Missing environment variable: ${key}`);
+
+    const value = Number(raw);
+    if (Number.isNaN(value) || value <= 0) {
       throw new Error(
-        `Missing or invalid numeric environment variable: ${key}`,
+        `Invalid numeric value for ${key}: must be a positive number (in seconds)`,
       );
-    return Number(value);
+    }
+    return value;
   }
 
+  // Pastikan environment string (secret)
   private static getRequiredString(config: ConfigService, key: string): string {
     const value = config.get<string>(key);
     if (!value) throw new Error(`Missing environment variable: ${key}`);
     return value;
   }
 
+  // Generate Access Token
   static async generateAccessToken(
     jwt: JwtService,
     config: ConfigService,
@@ -43,12 +51,13 @@ export class TokenHelper {
 
     const options: JwtSignOptions = {
       secret: this.getRequiredString(config, 'JWT_ACCESS_SECRET'),
-      expiresIn: this.getRequiredNumber(config, 'JWT_ACCESS_EXPIRES'),
+      expiresIn: this.getRequiredNumber(config, 'JWT_ACCESS_EXPIRES'), // detik
     };
 
     return jwt.signAsync(payload, options);
   }
 
+  // Generate Refresh Token
   static async generateRefreshToken(
     jwt: JwtService,
     config: ConfigService,
@@ -58,7 +67,7 @@ export class TokenHelper {
 
     const options: JwtSignOptions = {
       secret: this.getRequiredString(config, 'JWT_REFRESH_SECRET'),
-      expiresIn: this.getRequiredNumber(config, 'JWT_REFRESH_EXPIRES'),
+      expiresIn: this.getRequiredNumber(config, 'JWT_REFRESH_EXPIRES'), // detik
     };
 
     return jwt.signAsync(payload, options);

@@ -15,12 +15,26 @@ import { JwtStrategy } from './jwt/jwt.strategy';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService): JwtModuleOptions => ({
-        secret: config.get<string>('JWT_ACCESS_SECRET'),
-        signOptions: {
-          expiresIn: Number(config.get<number>('JWT_ACCESS_EXPIRES') ?? 900),
-        },
-      }),
+      useFactory: (config: ConfigService): JwtModuleOptions => {
+        const secret = config.get<string>('JWT_ACCESS_SECRET');
+        const expiresRaw = config.get<string>('JWT_ACCESS_EXPIRES');
+        const expiresIn = Number(expiresRaw);
+
+        if (!secret) {
+          throw new Error('Missing environment variable: JWT_ACCESS_SECRET');
+        }
+
+        if (Number.isNaN(expiresIn) || expiresIn <= 0) {
+          throw new Error(
+            `Invalid value for JWT_ACCESS_EXPIRES: "${expiresRaw}" — must be a positive number in seconds.`,
+          );
+        }
+
+        return {
+          secret,
+          signOptions: { expiresIn },
+        };
+      },
     }),
   ],
   controllers: [AuthController],
