@@ -17,6 +17,8 @@ export class UsersService {
     no_phone: true,
     role: true,
     photo_profile: true,
+    photo_id_card: true,
+    photo_driving_license: true,
   };
 
   constructor(
@@ -42,14 +44,8 @@ export class UsersService {
       const users = await this.prisma.users.findMany({
         select: this.USER_SELECT_FIELDS,
       });
-
-      if (!users.length) {
-        throw new HttpException(
-          'Pengguna tidak ditemukan',
-          HttpStatus.NOT_FOUND,
-        );
-      }
-
+      if (!users.length)
+        throw new HttpException('Tidak ada pengguna', HttpStatus.NOT_FOUND);
       return users;
     } catch (error) {
       PrismaErrorHelper.handle(error);
@@ -57,13 +53,36 @@ export class UsersService {
   }
 
   async findOne(id: number): Promise<FindUserResponseDto> {
-    const user = await this.prisma.users.findUnique({
-      where: { id },
-      select: this.USER_SELECT_FIELDS,
-    });
-    if (!user)
-      this.throwNotFound('Pengguna tidak ditemukan', 'ID tidak ditemukan');
-    return user;
+    try {
+      const user = await this.prisma.users.findUnique({
+        where: { id },
+        select: this.USER_SELECT_FIELDS,
+      });
+      if (!user)
+        this.throwNotFound('Pengguna tidak ditemukan', 'ID tidak ditemukan');
+
+      // Build public & private URLs
+      const photoProfileUrl = user.photo_profile
+        ? this.storage.buildPublicUrl(user.photo_profile)
+        : null;
+
+      const photoIdCardUrl = user.photo_id_card
+        ? await this.storage.createSignedUrl(user.photo_id_card)
+        : null;
+
+      const photoDrivingLicenseUrl = user.photo_driving_license
+        ? await this.storage.createSignedUrl(user.photo_driving_license)
+        : null;
+
+      return {
+        ...user,
+        photo_profile: photoProfileUrl,
+        photo_id_card: photoIdCardUrl,
+        photo_driving_license: photoDrivingLicenseUrl,
+      };
+    } catch (error) {
+      PrismaErrorHelper.handle(error);
+    }
   }
 
   async update(
@@ -73,11 +92,14 @@ export class UsersService {
   ): Promise<UpdateUserResponseDto> {
     if (accessUserId !== id)
       throw new HttpException('Akses ditolak', HttpStatus.FORBIDDEN);
+
     const existingUser = await this.findUserById(id);
     await this.validateUniqueFieldsForUpdate(dto, existingUser);
+
     const password = dto.password
       ? await PasswordHelper.hash(dto.password)
       : existingUser.password;
+
     return this.prisma.users.update({
       where: { id },
       data: { ...dto, password },
@@ -85,27 +107,59 @@ export class UsersService {
     });
   }
 
-  async updateUserPhotoProfile(id: number, urlPath: string) {
+  // === Update foto (menyimpan fileKey, bukan URL) ===
+  async updateUserPhotoProfile(id: number, fileKey: string) {
     return this.prisma.users.update({
       where: { id },
-      data: { photo_profile: urlPath },
+      data: { photo_profile: fileKey },
       select: { id: true, username: true, photo_profile: true },
     });
   }
 
-  async remove(id: number): Promise<{ message: string }> {
-    const user = await this.findUserById(id);
-    if (user.photo_profile) {
-      const fileKey = this.extractFileKey(user.photo_profile);
-      this.storage.delete(fileKey).catch(console.error);
-    }
-    await this.prisma.users.delete({ where: { id } });
-    return { message: `Pengguna ${id} dihapus` };
+  async updatePhotoDrivingLicense(id: number, fileKey: string) {
+    return this.prisma.users.update({
+      where: { id },
+      data: { photo_driving_license: fileKey },
+      select: { id: true, username: true, photo_driving_license: true },
+    });
   }
 
-  private extractFileKey(url: string) {
-    const parts = url.split('/uploads/');
-    return parts[1] ?? '';
+  async updatePhotoIdCard(id: number, fileKey: string) {
+    return this.prisma.users.update({
+      where: { id },
+      data: { photo_id_card: fileKey },
+      select: { id: true, username: true, photo_id_card: true },
+    });
+  }
+
+  // === Hapus user + semua file terkait ===
+  async remove(id: number): Promise<{ message: string }> {
+    const user = await this.findUserById(id);
+
+    // Hapus semua file storage (berdasarkan fileKey)
+    const deletions: Promise<void>[] = [];
+
+    if (user.photo_profile) {
+      deletions.push(this.storage.delete(user.photo_profile, false));
+    }
+
+    if (user.photo_id_card) {
+      deletions.push(this.storage.delete(user.photo_id_card as string, true));
+    }
+
+    if (user.photo_driving_license) {
+      deletions.push(
+        this.storage.delete(user.photo_driving_license as string, true),
+      );
+    }
+
+    // Jalankan paralel supaya cepat
+    await Promise.allSettled(deletions);
+
+    // Hapus user di DB
+    await this.prisma.users.delete({ where: { id } });
+
+    return { message: `Pengguna dengan ID ${id} berhasil dihapus` };
   }
 
   private async findUserById(id: number) {
@@ -123,20 +177,11 @@ export class UsersService {
 
     if (emailExists || usernameExists) {
       const errors: Record<string, string> = {};
-
-      if (emailExists) {
-        errors.email = 'Email sudah digunakan';
-      }
-
-      if (usernameExists) {
-        errors.username = 'Username sudah digunakan';
-      }
+      if (emailExists) errors.email = 'Email sudah digunakan';
+      if (usernameExists) errors.username = 'Username sudah digunakan';
 
       throw new HttpException(
-        {
-          message: 'Validasi gagal',
-          errors,
-        },
+        { message: 'Validasi gagal', errors },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -146,53 +191,40 @@ export class UsersService {
     dto: UpdateUserDto,
     existingUser: { email: string; username: string; password: string },
   ) {
-    type UserPromise = ReturnType<typeof this.prisma.users.findUnique>;
-    const checks: UserPromise[] = [];
+    const checks: Promise<any>[] = [];
 
-    if (dto.email && dto.email !== existingUser.email) {
+    if (dto.email && dto.email !== existingUser.email)
       checks.push(
         this.prisma.users.findUnique({ where: { email: dto.email } }),
       );
-    }
 
-    if (dto.username && dto.username !== existingUser.username) {
+    if (dto.username && dto.username !== existingUser.username)
       checks.push(
         this.prisma.users.findUnique({ where: { username: dto.username } }),
       );
-    }
 
     if (checks.length === 0) return;
 
     const results = await Promise.all(checks);
     const errors: Record<string, string> = {};
 
-    // Check which specific field caused the conflict
-    let index = 0;
-    if (dto.email && dto.email !== existingUser.email) {
-      if (results[index]) {
-        errors.email = 'Email sudah digunakan';
-      }
-      index++;
-    }
+    if (dto.email && dto.email !== existingUser.email && results[0])
+      errors.email = 'Email sudah digunakan';
 
-    if (dto.username && dto.username !== existingUser.username) {
-      if (results[index]) {
-        errors.username = 'Username sudah digunakan';
-      }
-    }
+    if (dto.username && dto.username !== existingUser.username && results[1])
+      errors.username = 'Username sudah digunakan';
 
-    if (Object.keys(errors).length > 0) {
+    if (Object.keys(errors).length)
       throw new HttpException(
-        {
-          message: 'Validasi gagal',
-          errors,
-        },
+        { message: 'Validasi gagal', errors },
         HttpStatus.BAD_REQUEST,
       );
-    }
   }
 
-  private throwNotFound(msg: string, detail: string): never {
-    throw new HttpException({ message: msg, errors: { user: detail } }, 404);
+  private throwNotFound(message: string, detail: string): never {
+    throw new HttpException(
+      { message, errors: { user: detail } },
+      HttpStatus.NOT_FOUND,
+    );
   }
 }

@@ -14,7 +14,7 @@ export class FindUserResponseDto {
   email?: string;
 
   @IsOptional()
-  @Matches(/^\d+$/, { message: 'NPM harus berupa angka' })
+  @Matches(/^\d+$/, { message: 'Nomor Pokok Mahasiswa harus berupa angka' })
   npm?: string;
 
   @IsOptional()
@@ -28,4 +28,12 @@ export class FindUserResponseDto {
   @IsOptional()
   @IsString({ message: 'Foto profil harus berupa teks' })
   photo_profile?: string | null;
+
+  @IsOptional()
+  @IsString({ message: 'Foto Kartu Tanda Penduduk harus berupa teks' })
+  photo_id_card?: string | null;
+
+  @IsOptional()
+  @IsString({ message: 'Foto Surat Izin Mengemudi harus berupa teks' })
+  photo_driving_license?: string | null;
 }

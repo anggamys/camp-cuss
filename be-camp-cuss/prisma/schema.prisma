@@ -15,30 +15,30 @@ datasource db {
 }
 
 model users {
-  id             Int       @id @default(autoincrement())
-  username       String    @unique
-  email          String    @unique
-  npm            String
-  no_phone       String
-  password       String
-  role           Role      @default(customer)
-  photo_ktp      String?
-  photo_sim      String?
-  photo_profile  String?
-  refresh_token  String?
-  created_at     DateTime  @default(now())
-  updated_at     DateTime  @updatedAt
+  id                      Int         @id @default(autoincrement())
+  username                String      @unique
+  email                   String      @unique
+  npm                     String
+  no_phone                String
+  password                String
+  role                    Role        @default(customer)
+  photo_id_card           String?
+  photo_driving_license   String?
+  photo_profile           String?
+  refresh_token           String?
+  created_at              DateTime    @default(now())
+  updated_at              DateTime    @updatedAt
 }
 
 model destinations {
-  id           Int      @id @default(autoincrement())
-  name         String
-  image_place  String
-  latitude     Float
-  longitude    Float
-  estimated    Int
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id            Int         @id @default(autoincrement())
+  name          String
+  image_place   String
+  latitude      Float
+  longitude     Float
+  estimated     Int
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
 }
 
 enum Role {
