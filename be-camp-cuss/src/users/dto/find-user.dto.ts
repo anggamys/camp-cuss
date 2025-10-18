@@ -24,4 +24,8 @@ export class FindUserResponseDto {
   @IsOptional()
   @IsString({ message: 'Role harus berupa teks' })
   role?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Foto profil harus berupa teks' })
+  photo_profile?: string | null;
 }
