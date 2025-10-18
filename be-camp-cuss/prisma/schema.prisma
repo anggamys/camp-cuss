@@ -22,9 +22,10 @@ model users {
   no_phone                String
   password                String
   role                    Role        @default(customer)
-  photo_id_card           String?
-  photo_driving_license   String?
   photo_profile           String?
+  photo_id_card           String?
+  photo_student_card      String?
+  photo_driving_license   String?
   refresh_token           String?
   created_at              DateTime    @default(now())
   updated_at              DateTime    @updatedAt

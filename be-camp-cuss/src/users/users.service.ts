@@ -18,6 +18,7 @@ export class UsersService {
     role: true,
     photo_profile: true,
     photo_id_card: true,
+    photo_student_card: true,
     photo_driving_license: true,
   };
 
@@ -107,7 +108,6 @@ export class UsersService {
     });
   }
 
-  // === Update foto (menyimpan fileKey, bukan URL) ===
   async updateUserPhotoProfile(id: number, fileKey: string) {
     return this.prisma.users.update({
       where: { id },
@@ -116,19 +116,27 @@ export class UsersService {
     });
   }
 
-  async updatePhotoDrivingLicense(id: number, fileKey: string) {
-    return this.prisma.users.update({
-      where: { id },
-      data: { photo_driving_license: fileKey },
-      select: { id: true, username: true, photo_driving_license: true },
-    });
-  }
-
   async updatePhotoIdCard(id: number, fileKey: string) {
     return this.prisma.users.update({
       where: { id },
       data: { photo_id_card: fileKey },
       select: { id: true, username: true, photo_id_card: true },
+    });
+  }
+
+  async updatePhotoStudentCard(id: number, fileKey: string) {
+    return this.prisma.users.update({
+      where: { id },
+      data: { photo_student_card: fileKey },
+      select: { id: true, username: true, photo_student_card: true },
+    });
+  }
+
+  async updatePhotoDrivingLicense(id: number, fileKey: string) {
+    return this.prisma.users.update({
+      where: { id },
+      data: { photo_driving_license: fileKey },
+      select: { id: true, username: true, photo_driving_license: true },
     });
   }
 

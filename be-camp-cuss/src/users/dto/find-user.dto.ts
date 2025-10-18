@@ -36,4 +36,8 @@ export class FindUserResponseDto {
   @IsOptional()
   @IsString({ message: 'Foto Surat Izin Mengemudi harus berupa teks' })
   photo_driving_license?: string | null;
+
+  @IsOptional()
+  @IsString({ message: 'Foto Kartu Tanda Mahasiswa harus berupa teks' })
+  photo_student_card?: string | null;
 }

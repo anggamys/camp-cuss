@@ -72,6 +72,13 @@ export class StoragesController {
         oldKey: user.photo_id_card,
         update: (uid, fileKey) => this.users.updatePhotoIdCard(uid, fileKey),
       },
+      'photo-student-card': {
+        folder: 'users/student-cards',
+        isPrivate: true,
+        oldKey: user.photo_student_card,
+        update: (uid, fileKey) =>
+          this.users.updatePhotoStudentCard(uid, fileKey),
+      },
       'photo-driving-license': {
         folder: 'users/licenses',
         isPrivate: true,
