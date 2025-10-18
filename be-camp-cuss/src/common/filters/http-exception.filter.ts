@@ -49,13 +49,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
           message = body.message;
         }
 
-        // Format error hasil ValidationPipe
+        // Jika ada field errors di body
         if (body.errors && typeof body.errors === 'object') {
           errors = Object.entries(body.errors).reduce<Record<string, string[]>>(
             (acc, [key, val]) => {
-              if (val === undefined || val === null) return acc;
+              if (!val) return acc;
               const values: string[] = Array.isArray(val)
-                ? (val as string[]).map((v) => String(v))
+                ? val.map((v) => String(v))
                 : [String(val)];
               acc[key] = values;
               return acc;
@@ -64,12 +64,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
           );
         }
 
-        // Fallback: handle ValidationError[] (misal belum diubah di ValidationPipe)
+        // Fallback untuk ValidationPipe default
         if (
           Array.isArray(body.message) &&
           body.message[0] instanceof ValidationError
         ) {
-          message = 'Validation failed';
+          message = 'Validasi gagal';
           const validationErrors = body.message as ValidationError[];
           errors = validationErrors.reduce<Record<string, string[]>>(
             (acc, err) => {
@@ -80,24 +80,28 @@ export class HttpExceptionFilter implements ExceptionFilter {
           );
         }
       }
+
+      // Jika pesan masih default dari Passport (bukan dari JwtAuthGuard)
+      if (status === HttpStatus.UNAUTHORIZED && message === 'Unauthorized') {
+        message = 'Token tidak disertakan atau tidak valid';
+      }
     } else if (exception instanceof Error) {
+      // Untuk error non-HTTP (runtime)
       message = exception.message;
     }
 
-    // Logging ringkas di console dev
+    // Logging ringan untuk development
     if (process.env.NODE_ENV !== 'production') {
-      const exceptionName =
-        exception instanceof Error
-          ? exception.constructor.name
-          : typeof exception;
       console.error(
-        `[HttpExceptionFilter] ${exceptionName}: ${message}`,
+        `[HttpExceptionFilter] ${
+          exception instanceof Error ? exception.name : typeof exception
+        }: ${message}`,
         errors ? JSON.stringify(errors, null, 2) : '',
       );
     }
 
     const errorResponse: ErrorResponse = {
-      status: status >= HttpStatus.BAD_REQUEST ? 'error' : 'success',
+      status: 'error',
       message,
       data: null,
       errors,

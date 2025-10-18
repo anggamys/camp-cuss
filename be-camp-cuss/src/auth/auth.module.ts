@@ -3,26 +3,42 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from './jwt/jwt.strategy';
 
 @Module({
   imports: [
     PrismaModule,
     ConfigModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret:
-          config.get<string>('JWT_ACCESS_SECRET') ?? 'default_access_secret',
-        signOptions: {
-          expiresIn: config.get<string>('JWT_ACCESS_EXPIRES') ?? '15m',
-        },
-      }),
+      useFactory: (config: ConfigService): JwtModuleOptions => {
+        const secret = config.get<string>('JWT_ACCESS_SECRET');
+        const expiresRaw = config.get<string>('JWT_ACCESS_EXPIRES');
+        const expiresIn = Number(expiresRaw);
+
+        if (!secret) {
+          throw new Error('Missing environment variable: JWT_ACCESS_SECRET');
+        }
+
+        if (Number.isNaN(expiresIn) || expiresIn <= 0) {
+          throw new Error(
+            `Invalid value for JWT_ACCESS_EXPIRES: "${expiresRaw}" — must be a positive number in seconds.`,
+          );
+        }
+
+        return {
+          secret,
+          signOptions: { expiresIn },
+        };
+      },
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, JwtStrategy],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

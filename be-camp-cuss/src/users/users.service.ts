@@ -1,14 +1,14 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-
 import { PrismaService } from '../prisma/prisma.services';
 import { CreateUserDto, CreateUserResponseDto } from './dto/create-user.dto';
 import { FindUserResponseDto } from './dto/find-user.dto';
 import { UpdateUserDto, UpdateUserResponseDto } from './dto/update-user.dto';
+import { PasswordHelper } from '../common/helpers/password.helper';
+import { PrismaErrorHelper } from '../common/helpers/prisma-error.helper';
+import { StoragesService } from '../storages/storages.service';
 
 @Injectable()
 export class UsersService {
-  private readonly BCRYPT_ROUNDS = 10;
   private readonly USER_SELECT_FIELDS = {
     id: true,
     username: true,
@@ -16,86 +16,164 @@ export class UsersService {
     npm: true,
     no_phone: true,
     role: true,
+    photo_profile: true,
+    photo_id_card: true,
+    photo_student_card: true,
+    photo_driving_license: true,
   };
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StoragesService,
+  ) {}
 
   async create(dto: CreateUserDto): Promise<CreateUserResponseDto> {
-    await this.validateUniqueFields(dto.email, dto.username);
-
-    const hashedPassword = await this.hashPassword(dto.password);
-
-    return this.prisma.users.create({
-      data: { ...dto, password: hashedPassword },
-      select: { id: true, email: true },
-    });
+    try {
+      await this.validateUniqueFields(dto.email, dto.username);
+      const hashedPassword = await PasswordHelper.hash(dto.password);
+      return await this.prisma.users.create({
+        data: { ...dto, password: hashedPassword },
+        select: { id: true, email: true },
+      });
+    } catch (error) {
+      PrismaErrorHelper.handle(error);
+    }
   }
 
   async findAll(): Promise<FindUserResponseDto[]> {
-    const users = await this.prisma.users.findMany({
-      select: this.USER_SELECT_FIELDS,
-    });
-
-    if (users.length === 0) {
-      this.throwNotFound(
-        'Tidak ada pengguna',
-        'Tidak ada pengguna di database',
-      );
+    try {
+      const users = await this.prisma.users.findMany({
+        select: this.USER_SELECT_FIELDS,
+      });
+      if (!users.length)
+        throw new HttpException('Tidak ada pengguna', HttpStatus.NOT_FOUND);
+      return users;
+    } catch (error) {
+      PrismaErrorHelper.handle(error);
     }
-
-    return users;
   }
 
   async findOne(id: number): Promise<FindUserResponseDto> {
-    const user = await this.prisma.users.findUnique({
-      where: { id },
-      select: this.USER_SELECT_FIELDS,
-    });
+    try {
+      const user = await this.prisma.users.findUnique({
+        where: { id },
+        select: this.USER_SELECT_FIELDS,
+      });
+      if (!user)
+        this.throwNotFound('Pengguna tidak ditemukan', 'ID tidak ditemukan');
 
-    if (!user) {
-      this.throwNotFound(
-        'Pengguna tidak ditemukan',
-        'Tidak ada pengguna dengan ID yang diberikan',
-      );
+      // Build public & private URLs
+      const photoProfileUrl = user.photo_profile
+        ? this.storage.buildPublicUrl(user.photo_profile)
+        : null;
+
+      const photoIdCardUrl = user.photo_id_card
+        ? await this.storage.createSignedUrl(user.photo_id_card)
+        : null;
+
+      const photoDrivingLicenseUrl = user.photo_driving_license
+        ? await this.storage.createSignedUrl(user.photo_driving_license)
+        : null;
+
+      return {
+        ...user,
+        photo_profile: photoProfileUrl,
+        photo_id_card: photoIdCardUrl,
+        photo_driving_license: photoDrivingLicenseUrl,
+      };
+    } catch (error) {
+      PrismaErrorHelper.handle(error);
     }
-
-    return user;
   }
 
   async update(
+    accessUserId: number,
     id: number,
-    updateUserDto: UpdateUserDto,
+    dto: UpdateUserDto,
   ): Promise<UpdateUserResponseDto> {
+    if (accessUserId !== id)
+      throw new HttpException('Akses ditolak', HttpStatus.FORBIDDEN);
+
     const existingUser = await this.findUserById(id);
+    await this.validateUniqueFieldsForUpdate(dto, existingUser);
 
-    await this.validateUniqueFieldsForUpdate(updateUserDto, existingUser);
-
-    const password = updateUserDto.password
-      ? await this.hashPassword(updateUserDto.password)
+    const password = dto.password
+      ? await PasswordHelper.hash(dto.password)
       : existingUser.password;
 
     return this.prisma.users.update({
       where: { id },
-      data: { ...updateUserDto, password },
+      data: { ...dto, password },
       select: this.USER_SELECT_FIELDS,
     });
   }
 
-  async remove(id: number): Promise<null> {
-    await this.findUserById(id);
-    await this.prisma.users.delete({ where: { id } });
-    return null;
+  async updateUserPhotoProfile(id: number, fileKey: string) {
+    return this.prisma.users.update({
+      where: { id },
+      data: { photo_profile: fileKey },
+      select: { id: true, username: true, photo_profile: true },
+    });
   }
 
-  // Private helper methods
-  private async findUserById(id: number) {
-    const user = await this.prisma.users.findUnique({ where: { id } });
-    if (!user) {
-      this.throwNotFound(
-        'Pengguna tidak ditemukan',
-        'Tidak ada pengguna dengan ID yang diberikan',
+  async updatePhotoIdCard(id: number, fileKey: string) {
+    return this.prisma.users.update({
+      where: { id },
+      data: { photo_id_card: fileKey },
+      select: { id: true, username: true, photo_id_card: true },
+    });
+  }
+
+  async updatePhotoStudentCard(id: number, fileKey: string) {
+    return this.prisma.users.update({
+      where: { id },
+      data: { photo_student_card: fileKey },
+      select: { id: true, username: true, photo_student_card: true },
+    });
+  }
+
+  async updatePhotoDrivingLicense(id: number, fileKey: string) {
+    return this.prisma.users.update({
+      where: { id },
+      data: { photo_driving_license: fileKey },
+      select: { id: true, username: true, photo_driving_license: true },
+    });
+  }
+
+  // === Hapus user + semua file terkait ===
+  async remove(id: number): Promise<{ message: string }> {
+    const user = await this.findUserById(id);
+
+    // Hapus semua file storage (berdasarkan fileKey)
+    const deletions: Promise<void>[] = [];
+
+    if (user.photo_profile) {
+      deletions.push(this.storage.delete(user.photo_profile, false));
+    }
+
+    if (user.photo_id_card) {
+      deletions.push(this.storage.delete(user.photo_id_card as string, true));
+    }
+
+    if (user.photo_driving_license) {
+      deletions.push(
+        this.storage.delete(user.photo_driving_license as string, true),
       );
     }
+
+    // Jalankan paralel supaya cepat
+    await Promise.allSettled(deletions);
+
+    // Hapus user di DB
+    await this.prisma.users.delete({ where: { id } });
+
+    return { message: `Pengguna dengan ID ${id} berhasil dihapus` };
+  }
+
+  private async findUserById(id: number) {
+    const user = await this.prisma.users.findUnique({ where: { id } });
+    if (!user)
+      this.throwNotFound('Pengguna tidak ditemukan', 'ID tidak ditemukan');
     return user;
   }
 
@@ -106,74 +184,54 @@ export class UsersService {
     ]);
 
     if (emailExists || usernameExists) {
+      const errors: Record<string, string> = {};
+      if (emailExists) errors.email = 'Email sudah digunakan';
+      if (usernameExists) errors.username = 'Username sudah digunakan';
+
       throw new HttpException(
-        {
-          message: 'Validasi gagal',
-          errors: {
-            email: emailExists ? 'Email sudah digunakan' : undefined,
-            username: usernameExists
-              ? 'Nama pengguna sudah digunakan'
-              : undefined,
-          },
-        },
+        { message: 'Validasi gagal', errors },
         HttpStatus.BAD_REQUEST,
       );
     }
   }
 
   private async validateUniqueFieldsForUpdate(
-    updateDto: UpdateUserDto,
+    dto: UpdateUserDto,
     existingUser: { email: string; username: string; password: string },
   ) {
-    const validations: Promise<{ field: string; exists: any }>[] = [];
+    const checks: Promise<any>[] = [];
 
-    if (updateDto.email && updateDto.email !== existingUser.email) {
-      validations.push(
-        this.prisma.users
-          .findUnique({ where: { email: updateDto.email } })
-          .then((exists) => ({ field: 'email', exists })),
+    if (dto.email && dto.email !== existingUser.email)
+      checks.push(
+        this.prisma.users.findUnique({ where: { email: dto.email } }),
       );
-    }
 
-    if (updateDto.username && updateDto.username !== existingUser.username) {
-      validations.push(
-        this.prisma.users
-          .findUnique({ where: { username: updateDto.username } })
-          .then((exists) => ({ field: 'username', exists })),
+    if (dto.username && dto.username !== existingUser.username)
+      checks.push(
+        this.prisma.users.findUnique({ where: { username: dto.username } }),
       );
-    }
 
-    if (validations.length > 0) {
-      const results = await Promise.all(validations);
-      const conflicts = results.filter((result) => result.exists);
+    if (checks.length === 0) return;
 
-      if (conflicts.length > 0) {
-        const fieldLabels: Record<string, string> = {
-          email: 'Email',
-          username: 'Nama pengguna',
-        };
+    const results = await Promise.all(checks);
+    const errors: Record<string, string> = {};
 
-        const errors = conflicts.reduce((acc, conflict) => {
-          const label = fieldLabels[conflict.field] || conflict.field;
-          acc[conflict.field] = `${label} sudah digunakan`;
-          return acc;
-        }, {});
+    if (dto.email && dto.email !== existingUser.email && results[0])
+      errors.email = 'Email sudah digunakan';
 
-        throw new HttpException(
-          { message: 'Validasi gagal', errors },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    }
+    if (dto.username && dto.username !== existingUser.username && results[1])
+      errors.username = 'Username sudah digunakan';
+
+    if (Object.keys(errors).length)
+      throw new HttpException(
+        { message: 'Validasi gagal', errors },
+        HttpStatus.BAD_REQUEST,
+      );
   }
 
-  private async hashPassword(password: string): Promise<string> {
-    return bcrypt.hash(password, this.BCRYPT_ROUNDS);
-  }
-
-  private throwNotFound(message: string, errorDetail: string): never {
+  private throwNotFound(message: string, detail: string): never {
     throw new HttpException(
-      { message, errors: { user: errorDetail } },
+      { message, errors: { user: detail } },
       HttpStatus.NOT_FOUND,
     );
   }
