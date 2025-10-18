@@ -22,9 +22,8 @@ model users {
   no_phone       String
   password       String
   role           Role      @default(customer)
-  ktm            String?
-  ktp            String?
-  sim            String?
+  photo_ktp      String?
+  photo_sim      String?
   photo_profile  String?
   refresh_token  String?
   created_at     DateTime  @default(now())
