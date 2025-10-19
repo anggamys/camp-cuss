@@ -6,6 +6,7 @@ import {
   IsLongitude,
   IsNumber,
   Min,
+  IsOptional,
 } from 'class-validator';
 
 export class CreateDestinationDto {
@@ -14,8 +15,8 @@ export class CreateDestinationDto {
   name: string;
 
   @IsString({ message: 'image_place harus berupa string' })
-  @IsNotEmpty({ message: 'image_place tidak boleh kosong' })
-  image_place: string;
+  @IsOptional()
+  image_place: string | null;
 
   @Type(() => Number)
   @IsNumber({}, { message: 'latitude harus berupa angka' })
@@ -42,8 +43,8 @@ export class responseCreateDestinationDto {
   name: string;
 
   @IsString({ message: 'image_place harus berupa string' })
-  @IsNotEmpty({ message: 'image_place tidak boleh kosong' })
-  image_place: string;
+  @IsOptional()
+  image_place: string | null;
 
   @IsNumber({}, { message: 'latitude harus berupa angka' })
   @IsLatitude({ message: 'latitude harus berupa nilai lintang yang valid' })
