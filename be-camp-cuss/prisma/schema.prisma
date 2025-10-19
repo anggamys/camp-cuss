@@ -33,8 +33,8 @@ model users {
 
 model destinations {
   id            Int         @id @default(autoincrement())
-  name          String
-  image_place   String
+  name          String      @unique
+  image_place   String?
   latitude      Float
   longitude     Float
   estimated     Int

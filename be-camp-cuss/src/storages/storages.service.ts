@@ -20,7 +20,7 @@ interface SignedUrlResponse {
 }
 
 export interface UploadedFileResult {
-  key: string; // hanya file key, tanpa URL
+  key: string;
 }
 
 @Injectable()
@@ -52,7 +52,6 @@ export class StoragesService {
     );
   }
 
-  // === Upload file ===
   async upload(
     file: Express.Multer.File,
     targetPath: string,
@@ -82,7 +81,6 @@ export class StoragesService {
     }
   }
 
-  // === Hapus file ===
   async delete(fileKey: string, isPrivate = false): Promise<void> {
     if (!fileKey) return;
     const bucket = isPrivate ? this.bucketPrivate : this.bucketPublic;
@@ -99,7 +97,6 @@ export class StoragesService {
     }
   }
 
-  // === Buat signed URL untuk akses private ===
   async createSignedUrl(fileKey: string, expiresIn = 3600): Promise<string> {
     const response = (await this.supabase.storage
       .from(this.bucketPrivate)
@@ -117,7 +114,6 @@ export class StoragesService {
     return response.data.signedUrl;
   }
 
-  // === Helper umum ===
   generateFileKey(targetPath: string, originalName: string): string {
     const ext = path.extname(originalName);
     const safeName = `${Date.now()}-${randomUUID()}${ext}`;

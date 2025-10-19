@@ -25,7 +25,7 @@ CREATE TABLE "users" (
 CREATE TABLE "destinations" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
-    "image_place" TEXT NOT NULL,
+    "image_place" TEXT,
     "latitude" DOUBLE PRECISION NOT NULL,
     "longitude" DOUBLE PRECISION NOT NULL,
     "estimated" INTEGER NOT NULL,
@@ -40,3 +40,6 @@ CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "destinations_name_key" ON "destinations"("name");
