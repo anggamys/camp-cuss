@@ -16,22 +16,10 @@ import { StoragesService } from './storages.service';
 import { UsersService } from '../users/users.service';
 import { User } from '../common/decorators/user.decorator';
 import { DestinationsService } from '../destinations/destinations.service';
-
-interface UploadConfig {
-  folder: string;
-  isPrivate: boolean;
-  oldKey?: string | null;
-  update: (
-    uid: number,
-    fileKey: string,
-  ) => Promise<{ id: number; [key: string]: any }>;
-}
-
-interface UploadResponse {
-  status: string;
-  message: string;
-  data: { id: number; [key: string]: any };
-}
+import {
+  UploadConfig,
+  UploadResponse,
+} from './types/storages-controller.interface';
 
 @UseGuards(JwtAuthGuard)
 @Controller('storages')

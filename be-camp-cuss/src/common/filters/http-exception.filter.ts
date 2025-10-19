@@ -7,20 +7,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ValidationError } from 'class-validator';
-
-interface ErrorResponse {
-  status: 'error' | 'success';
-  message: string;
-  data: null;
-  errors: Record<string, string[]> | null;
-  meta: null;
-}
-
-interface HttpErrorBody {
-  message?: string | string[] | ValidationError[];
-  errors?: Record<string, string[]> | Record<string, string>;
-  [key: string]: unknown;
-}
+import { ErrorResponse, HttpErrorBody } from '../types/http-error.interface';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -29,7 +16,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
+    let message = 'Terjadi kesalahan pada server';
     let errors: Record<string, string[]> | null = null;
 
     if (exception instanceof HttpException) {
@@ -67,10 +54,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
         // Fallback untuk ValidationPipe default
         if (
           Array.isArray(body.message) &&
-          body.message[0] instanceof ValidationError
+          typeof body.message[0] === 'object' &&
+          body.message[0] !== null &&
+          'constraints' in body.message[0]
         ) {
           message = 'Validasi gagal';
-          const validationErrors = body.message as ValidationError[];
+          const validationErrors = body.message as unknown as ValidationError[];
           errors = validationErrors.reduce<Record<string, string[]>>(
             (acc, err) => {
               acc[err.property] = Object.values(err.constraints ?? {});

@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './jwt/jwt.strategy';
+import { JwtEnvKeys } from '../common/enums/env-keys.enum';
 
 @Module({
   imports: [
@@ -16,8 +17,8 @@ import { JwtStrategy } from './jwt/jwt.strategy';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService): JwtModuleOptions => {
-        const secret = config.get<string>('JWT_ACCESS_SECRET');
-        const expiresRaw = config.get<string>('JWT_ACCESS_EXPIRES');
+        const secret = config.get<string>(JwtEnvKeys.JWT_ACCESS_SECRET);
+        const expiresRaw = config.get<string>(JwtEnvKeys.JWT_ACCESS_EXPIRES);
         const expiresIn = Number(expiresRaw);
 
         if (!secret) {

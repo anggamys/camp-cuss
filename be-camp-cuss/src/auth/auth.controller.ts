@@ -1,7 +1,9 @@
-import { Body, Controller, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { loginDto, refreshTokenDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { User } from '../common/decorators/user.decorator';
+import { JwtAuthGuard } from './jwt/jwt.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -13,14 +15,13 @@ export class AuthController {
     return { message: 'User registered successfully', data: user };
   }
 
-  @HttpCode(200)
   @Post('login')
   async login(@Body() body: loginDto) {
     const tokens = await this.authService.login(body);
 
     return {
       status: 'success',
-      message: 'Login successful',
+      message: 'Login berhasil',
       data: {
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
@@ -28,16 +29,22 @@ export class AuthController {
     };
   }
 
-  @HttpCode(200)
   @Post('refresh-token')
   async refreshToken(@Body() body: refreshTokenDto) {
     const tokens = await this.authService.refreshToken(body);
     return {
       status: 'success',
-      message: 'Token refreshed successfully',
+      message: 'Token berhasil diperbarui',
       data: {
         access_token: tokens.access_token,
       },
     };
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logout(@User('id') userAccessId: number) {
+    await this.authService.logout(userAccessId);
+    return { message: 'Logout berhasil' };
   }
 }
