@@ -1,30 +1,32 @@
 FROM node:22-alpine
 WORKDIR /app
+ENV TZ=Asia/Jakarta PORT=3000
 
-# Install dependensi sistem
+# Install system dependencies
 RUN apk add --no-cache openssl dumb-init
 
-# Copy dan install semua dependency (termasuk dev)
+# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --prefer-offline
 
 # Copy source code
 COPY . .
 
-# Generate Prisma dan build NestJS
+# Generate Prisma client and build NestJS
 RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
 
-# Setelah build selesai, baru ubah ke mode production
-ENV NODE_ENV=production TZ=Asia/Jakarta PORT=3000
+# Switch to production
+ENV NODE_ENV=production
 
-# Prune devDependencies agar image kecil
-RUN npm prune --omit=dev && npm cache clean --force
+# Remove dev dependencies
+RUN npm prune --omit=dev
 
-# Copy entrypoint
+# Copy entrypoint untuk migrasi otomatis
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# Expose port
 EXPOSE 3000
 
 ENTRYPOINT ["dumb-init", "/usr/local/bin/docker-entrypoint.sh"]
