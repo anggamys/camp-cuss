@@ -6,11 +6,14 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { DestinationsService } from './destinations.service';
 import { CreateDestinationDto } from './dto/create-destination.dto';
 import { UpdateDestinationDto } from './dto/update-destination.dto';
+import { JwtAuthGuard } from '../auth/jwt/jwt.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('destinations')
 export class DestinationsController {
   constructor(private readonly destinationsService: DestinationsService) {}

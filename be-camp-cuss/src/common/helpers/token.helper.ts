@@ -1,6 +1,7 @@
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { users } from '@prisma/client';
+import { JwtEnvKeys } from '../enums/env-keys.enum';
 
 interface JwtPayload {
   sub: number;
@@ -50,8 +51,8 @@ export class TokenHelper {
     const payload = this.buildPayload(user);
 
     const options: JwtSignOptions = {
-      secret: this.getRequiredString(config, 'JWT_ACCESS_SECRET'),
-      expiresIn: this.getRequiredNumber(config, 'JWT_ACCESS_EXPIRES'), // detik
+      secret: this.getRequiredString(config, JwtEnvKeys.JWT_ACCESS_SECRET),
+      expiresIn: this.getRequiredNumber(config, JwtEnvKeys.JWT_ACCESS_EXPIRES),
     };
 
     return jwt.signAsync(payload, options);
@@ -66,8 +67,8 @@ export class TokenHelper {
     const payload = this.buildPayload(user);
 
     const options: JwtSignOptions = {
-      secret: this.getRequiredString(config, 'JWT_REFRESH_SECRET'),
-      expiresIn: this.getRequiredNumber(config, 'JWT_REFRESH_EXPIRES'), // detik
+      secret: this.getRequiredString(config, JwtEnvKeys.JWT_REFRESH_SECRET),
+      expiresIn: this.getRequiredNumber(config, JwtEnvKeys.JWT_REFRESH_EXPIRES),
     };
 
     return jwt.signAsync(payload, options);

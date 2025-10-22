@@ -152,13 +152,11 @@ export class UsersService {
     }
 
     if (user.photo_id_card) {
-      deletions.push(this.storage.delete(user.photo_id_card as string, true));
+      deletions.push(this.storage.delete(user.photo_id_card, true));
     }
 
     if (user.photo_driving_license) {
-      deletions.push(
-        this.storage.delete(user.photo_driving_license as string, true),
-      );
+      deletions.push(this.storage.delete(user.photo_driving_license, true));
     }
 
     // Jalankan paralel supaya cepat

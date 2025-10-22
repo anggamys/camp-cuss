@@ -3,25 +3,17 @@ import {
   DeleteObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import {
-  Injectable,
-  BadRequestException,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-interface SignedUrlResponse {
-  data: { signedUrl: string } | null;
-  error: { message: string } | null;
-}
-
-export interface UploadedFileResult {
-  key: string; // hanya file key, tanpa URL
-}
+import { StorageEnvKeys } from '../common/enums/env-keys.enum';
+import {
+  SignedUrlResponse,
+  UploadedFileResult,
+} from './types/storages.interface';
 
 @Injectable()
 export class StoragesService {
@@ -29,36 +21,36 @@ export class StoragesService {
   private readonly bucketPublic: string;
   private readonly bucketPrivate: string;
   private readonly baseUrl: string;
-  private readonly supabase: SupabaseClient<any, any, any>;
+  private readonly supabase: SupabaseClient<any, any, any, any, any>;
 
   constructor(private readonly config: ConfigService) {
-    this.bucketPublic = this.getEnv('S3_BUCKET_PUBLIC');
-    this.bucketPrivate = this.getEnv('S3_BUCKET_PRIVATE');
-    this.baseUrl = this.getEnv('SUPABASE_PUBLIC_URL');
+    this.bucketPublic = this.getEnv(StorageEnvKeys.S3_BUCKET_PUBLIC);
+    this.bucketPrivate = this.getEnv(StorageEnvKeys.S3_BUCKET_PRIVATE);
+    this.baseUrl = this.getEnv(StorageEnvKeys.SUPABASE_PUBLIC_URL);
 
     this.s3 = new S3Client({
-      region: this.getEnv('S3_REGION'),
-      endpoint: this.getEnv('S3_ENDPOINT'),
+      region: this.getEnv(StorageEnvKeys.S3_REGION),
+      endpoint: this.getEnv(StorageEnvKeys.S3_ENDPOINT),
       forcePathStyle: true,
       credentials: {
-        accessKeyId: this.getEnv('S3_ACCESS_KEY_ID'),
-        secretAccessKey: this.getEnv('S3_SECRET_ACCESS_KEY'),
+        accessKeyId: this.getEnv(StorageEnvKeys.S3_ACCESS_KEY_ID),
+        secretAccessKey: this.getEnv(StorageEnvKeys.S3_SECRET_ACCESS_KEY),
       },
     });
 
     this.supabase = createClient(
-      this.getEnv('SUPABASE_PUBLIC_URL'),
-      this.getEnv('SUPABASE_SERVICE_ROLE_KEY'),
+      this.getEnv(StorageEnvKeys.SUPABASE_PUBLIC_URL),
+      this.getEnv(StorageEnvKeys.SUPABASE_SERVICE_ROLE_KEY),
     );
   }
 
-  // === Upload file ===
   async upload(
     file: Express.Multer.File,
     targetPath: string,
     isPrivate = false,
   ): Promise<UploadedFileResult> {
-    if (!file) throw new BadRequestException('File wajib diunggah');
+    if (!file)
+      throw new HttpException('File wajib diunggah', HttpStatus.BAD_REQUEST);
 
     const bucket = isPrivate ? this.bucketPrivate : this.bucketPublic;
     const fileKey = this.generateFileKey(targetPath, file.originalname);
@@ -82,7 +74,6 @@ export class StoragesService {
     }
   }
 
-  // === Hapus file ===
   async delete(fileKey: string, isPrivate = false): Promise<void> {
     if (!fileKey) return;
     const bucket = isPrivate ? this.bucketPrivate : this.bucketPublic;
@@ -99,17 +90,17 @@ export class StoragesService {
     }
   }
 
-  // === Buat signed URL untuk akses private ===
   async createSignedUrl(fileKey: string, expiresIn = 3600): Promise<string> {
     const response = (await this.supabase.storage
       .from(this.bucketPrivate)
       .createSignedUrl(fileKey, expiresIn)) as SignedUrlResponse;
 
-    if (response.error)
+    if (response.error) {
       throw new HttpException(
         response.error.message || 'Failed to create signed URL',
         HttpStatus.BAD_REQUEST,
       );
+    }
 
     if (!response.data?.signedUrl)
       throw new HttpException('No signed URL returned', HttpStatus.BAD_REQUEST);
@@ -117,7 +108,6 @@ export class StoragesService {
     return response.data.signedUrl;
   }
 
-  // === Helper umum ===
   generateFileKey(targetPath: string, originalName: string): string {
     const ext = path.extname(originalName);
     const safeName = `${Date.now()}-${randomUUID()}${ext}`;

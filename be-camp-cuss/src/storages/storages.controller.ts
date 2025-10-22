@@ -15,22 +15,11 @@ import { JwtAuthGuard } from '../auth/jwt/jwt.guard';
 import { StoragesService } from './storages.service';
 import { UsersService } from '../users/users.service';
 import { User } from '../common/decorators/user.decorator';
-
-interface UploadConfig {
-  folder: string;
-  isPrivate: boolean;
-  oldKey?: string | null;
-  update: (
-    uid: number,
-    fileKey: string,
-  ) => Promise<{ id: number; username: string; [key: string]: any }>;
-}
-
-interface UploadResponse {
-  status: string;
-  message: string;
-  data: { id: number; username: string; [key: string]: any };
-}
+import { DestinationsService } from '../destinations/destinations.service';
+import {
+  UploadConfig,
+  UploadResponse,
+} from './types/storages-controller.interface';
 
 @UseGuards(JwtAuthGuard)
 @Controller('storages')
@@ -38,9 +27,9 @@ export class StoragesController {
   constructor(
     private readonly storages: StoragesService,
     private readonly users: UsersService,
+    private readonly destinations: DestinationsService,
   ) {}
 
-  // === Upload foto user (public / private) ===
   @Post('users/:id/upload/:type')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async uploadUserFile(
@@ -114,6 +103,38 @@ export class StoragesController {
       status: 'success',
       message: `Upload ${type} berhasil`,
       data: updatedUser,
+    };
+  }
+
+  @Post('destinations/:id/upload')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadDestinationFile(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<UploadResponse> {
+    if (!file)
+      throw new HttpException('File wajib diunggah', HttpStatus.BAD_REQUEST);
+
+    const destination = await this.destinations.findOne(id);
+
+    // Hapus file lama (jika ada)
+    if (destination.image_place) {
+      await this.storages
+        .delete(destination.image_place, true)
+        .catch(console.error);
+    }
+
+    // Upload file baru dan simpan fileKey di database
+    const uploaded = await this.storages.upload(file, 'destinations', false);
+    const updatedDestination = await this.destinations.updateImagePlace(
+      id,
+      uploaded.key,
+    );
+
+    return {
+      status: 'success',
+      message: `Upload image_place berhasil`,
+      data: updatedDestination,
     };
   }
 }

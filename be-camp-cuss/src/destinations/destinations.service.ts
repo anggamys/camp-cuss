@@ -14,16 +14,20 @@ import {
 import { PrismaService } from '../prisma/prisma.services';
 import { PrismaErrorHelper } from '../common/helpers/prisma-error.helper';
 import { destinations, Prisma } from '@prisma/client';
+import { StoragesService } from '../storages/storages.service';
 
 @Injectable()
 export class DestinationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storages: StoragesService,
+  ) {}
 
   async create(
     dto: CreateDestinationDto,
   ): Promise<responseCreateDestinationDto> {
     try {
-      const exists = await this.prisma.destinations.findFirst({
+      const exists = await this.prisma.destinations.findUnique({
         where: { name: dto.name },
       });
 
@@ -34,9 +38,17 @@ export class DestinationsService {
         });
       }
 
-      return await this.prisma.destinations.create({ data: dto });
+      const created = await this.prisma.destinations.create({ data: dto });
+
+      if (created.image_place) {
+        const imagePlaceUrl = this.storages.buildPublicUrl(created.image_place);
+        return { ...created, image_place: imagePlaceUrl };
+      }
+
+      return { ...created, image_place: null };
     } catch (error) {
       PrismaErrorHelper.handle(error);
+      throw error;
     }
   }
 
@@ -57,7 +69,7 @@ export class DestinationsService {
           where,
           skip,
           take: limit,
-          orderBy: { id: 'asc' },
+          orderBy: { name: 'asc' },
         }),
         this.prisma.destinations.count({ where }),
       ]);
@@ -67,6 +79,12 @@ export class DestinationsService {
           message: 'Tidak ada destinasi',
           errors: { destination: 'Tidak ada data destinasi ditemukan' },
         });
+      }
+
+      for (const destination of data) {
+        destination.image_place = destination.image_place
+          ? this.storages.buildPublicUrl(destination.image_place)
+          : null;
       }
 
       return {
@@ -90,6 +108,10 @@ export class DestinationsService {
         where: { id },
       });
 
+      const imagePlaceUrl = destination?.image_place
+        ? this.storages.buildPublicUrl(destination.image_place)
+        : null;
+
       if (!destination) {
         throw new NotFoundException({
           message: 'Destinasi tidak ditemukan',
@@ -97,7 +119,10 @@ export class DestinationsService {
         });
       }
 
-      return destination;
+      return {
+        ...destination,
+        image_place: imagePlaceUrl,
+      };
     } catch (error) {
       PrismaErrorHelper.handle(error);
     }
@@ -130,7 +155,47 @@ export class DestinationsService {
         }
       }
 
-      return await this.prisma.destinations.update({ where: { id }, data });
+      const updated = await this.prisma.destinations.update({
+        where: { id },
+        data,
+      });
+
+      const imagePlaceUrl = updated?.image_place
+        ? this.storages.buildPublicUrl(updated.image_place)
+        : null;
+
+      return { ...updated, image_place: imagePlaceUrl };
+    } catch (error) {
+      PrismaErrorHelper.handle(error);
+    }
+  }
+
+  async updateImagePlace(
+    id: number,
+    image_place: string,
+  ): Promise<destinations> {
+    try {
+      const existing = await this.prisma.destinations.findUnique({
+        where: { id },
+      });
+
+      if (!existing) {
+        throw new NotFoundException({
+          message: 'Destinasi tidak ditemukan',
+          errors: { id: `Tidak ada destinasi dengan ID ${id}` },
+        });
+      }
+
+      const updated = await this.prisma.destinations.update({
+        where: { id },
+        data: { image_place },
+      });
+
+      const imagePlaceUrl = updated?.image_place
+        ? this.storages.buildPublicUrl(updated.image_place)
+        : null;
+
+      return { ...updated, image_place: imagePlaceUrl };
     } catch (error) {
       PrismaErrorHelper.handle(error);
     }
@@ -146,6 +211,10 @@ export class DestinationsService {
           message: 'Destinasi tidak ditemukan',
           errors: { id: `Tidak ada destinasi dengan ID ${id}` },
         });
+      }
+
+      if (exists.image_place) {
+        await this.storages.delete(exists.image_place, true);
       }
 
       await this.prisma.destinations.delete({ where: { id } });

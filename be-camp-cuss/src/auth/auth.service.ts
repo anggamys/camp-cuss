@@ -136,13 +136,23 @@ export class AuthService {
     }
   }
 
-  async logout(userId: number) {
-    await this.prisma.users.update({
-      where: { id: userId },
-      data: { refresh_token: null },
-    });
+  async logout(userId: number): Promise<void> {
+    try {
+      console.log('Logging out user with ID:', userId);
 
-    return { status: 'sukses', message: 'Logout berhasil' };
+      await this.prisma.users.update({
+        where: { id: userId },
+        data: { refresh_token: null },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
+      throw new HttpException(
+        { message: 'Gagal logout', errors: { logout: errorMessage } },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   private async validateUniqueFields(email: string, username: string) {

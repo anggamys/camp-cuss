@@ -5,6 +5,7 @@ import {
   IsLongitude,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
   Min,
 } from 'class-validator';
@@ -24,8 +25,8 @@ export class responseUpdateDestinationDto {
   name: string;
 
   @IsString({ message: 'image_place harus berupa string' })
-  @IsNotEmpty({ message: 'image_place tidak boleh kosong' })
-  image_place: string;
+  @IsOptional()
+  image_place: string | null;
 
   @IsNumber({}, { message: 'latitude harus berupa angka' })
   @IsLatitude({ message: 'latitude harus berupa nilai lintang yang valid' })

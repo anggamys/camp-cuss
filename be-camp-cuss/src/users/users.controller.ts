@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/jwt/jwt.guard';
 import { User } from '../common/decorators/user.decorator';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -25,21 +26,18 @@ export class UsersController {
     return { message: 'Pengguna dibuat', data: user };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get()
   async findAll() {
     const users = await this.usersService.findAll();
     return { message: 'Daftar pengguna', data: users };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get(':id')
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const user = await this.usersService.findOne(id);
     return { message: 'Detail pengguna', data: user };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async update(
     @User('id') accessUserId: number,
@@ -50,7 +48,6 @@ export class UsersController {
     return { message: 'Data pengguna diperbarui', data: updatedUser };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async remove(@Param('id', ParseIntPipe) id: number) {
     const user = await this.usersService.remove(id);
