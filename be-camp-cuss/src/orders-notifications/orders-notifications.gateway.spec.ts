@@ -10,7 +10,9 @@ describe('OrdersNotificationsGateway', () => {
       providers: [OrdersNotificationsGateway, OrdersNotificationsService],
     }).compile();
 
-    gateway = module.get<OrdersNotificationsGateway>(OrdersNotificationsGateway);
+    gateway = module.get<OrdersNotificationsGateway>(
+      OrdersNotificationsGateway,
+    );
   });
 
   it('should be defined', () => {

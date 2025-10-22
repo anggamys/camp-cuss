@@ -8,6 +8,9 @@ import { Prisma } from '@prisma/client';
 
 export class PrismaErrorHelper {
   static handle(error: unknown): never {
+    // Tambahkan log biar ketahuan aslinya
+    console.error('🔥 PrismaErrorHelper caught error:', error);
+
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       switch (error.code) {
         case 'P2002':
@@ -30,11 +33,20 @@ export class PrismaErrorHelper {
         default:
           throw new InternalServerErrorException({
             message: 'Database error',
-            errors: { code: error.code },
+            errors: {
+              code: error.code,
+              meta: error.meta,
+              target:
+                'meta' in error && typeof error.meta === 'object'
+                  ? (error.meta as { target?: string }).target
+                  : undefined,
+            },
           });
       }
     }
 
+    // Log untuk error lain yang bukan PrismaClientKnownRequestError
+    console.error('🔥 Non-Prisma error detail:', error);
     throw new InternalServerErrorException({
       message: 'Unexpected server error',
       errors: { detail: (error as Error).message },

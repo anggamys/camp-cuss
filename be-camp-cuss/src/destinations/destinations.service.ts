@@ -48,6 +48,7 @@ export class DestinationsService {
       return { ...created, image_place: null };
     } catch (error) {
       PrismaErrorHelper.handle(error);
+      throw error;
     }
   }
 
