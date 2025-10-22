@@ -1,14 +1,22 @@
-import { WebSocketGateway, SubscribeMessage, MessageBody } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 import { OrdersNotificationsService } from './orders-notifications.service';
 import { CreateOrdersNotificationDto } from './dto/create-orders-notification.dto';
 import { UpdateOrdersNotificationDto } from './dto/update-orders-notification.dto';
 
 @WebSocketGateway()
 export class OrdersNotificationsGateway {
-  constructor(private readonly ordersNotificationsService: OrdersNotificationsService) {}
+  constructor(
+    private readonly ordersNotificationsService: OrdersNotificationsService,
+  ) {}
 
   @SubscribeMessage('createOrdersNotification')
-  create(@MessageBody() createOrdersNotificationDto: CreateOrdersNotificationDto) {
+  create(
+    @MessageBody() createOrdersNotificationDto: CreateOrdersNotificationDto,
+  ) {
     return this.ordersNotificationsService.create(createOrdersNotificationDto);
   }
 
@@ -23,8 +31,13 @@ export class OrdersNotificationsGateway {
   }
 
   @SubscribeMessage('updateOrdersNotification')
-  update(@MessageBody() updateOrdersNotificationDto: UpdateOrdersNotificationDto) {
-    return this.ordersNotificationsService.update(updateOrdersNotificationDto.id, updateOrdersNotificationDto);
+  update(
+    @MessageBody() updateOrdersNotificationDto: UpdateOrdersNotificationDto,
+  ) {
+    return this.ordersNotificationsService.update(
+      updateOrdersNotificationDto.id,
+      updateOrdersNotificationDto,
+    );
   }
 
   @SubscribeMessage('removeOrdersNotification')
