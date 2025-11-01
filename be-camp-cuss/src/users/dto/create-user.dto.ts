@@ -5,7 +5,7 @@ import {
   IsOptional,
   IsEnum,
 } from 'class-validator';
-import { Role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 export class CreateUserDto {
   @IsString({ message: 'Username harus berupa string' })
@@ -28,9 +28,9 @@ export class CreateUserDto {
   @IsNotEmpty({ message: 'Nomor telepon tidak boleh kosong' })
   no_phone: string;
 
-  @IsEnum(Role, { message: 'Role tidak valid' })
   @IsOptional()
-  role: Role;
+  @IsEnum(UserRole, { message: 'Role tidak valid' })
+  role: UserRole;
 }
 
 export class CreateUserResponseDto {
@@ -40,4 +40,8 @@ export class CreateUserResponseDto {
   @IsEmail({}, { message: 'Email tidak valid' })
   @IsNotEmpty({ message: 'Email tidak boleh kosong' })
   email: string;
+
+  @IsString({ message: 'Username harus berupa string' })
+  @IsNotEmpty({ message: 'Username tidak boleh kosong' })
+  username: string;
 }

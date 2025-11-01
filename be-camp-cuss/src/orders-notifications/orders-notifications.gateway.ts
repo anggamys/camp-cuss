@@ -1,47 +1,48 @@
 import {
   WebSocketGateway,
+  WebSocketServer,
+  ConnectedSocket,
   SubscribeMessage,
-  MessageBody,
 } from '@nestjs/websockets';
+import { Server } from 'socket.io';
+import { UseFilters, UseGuards } from '@nestjs/common';
 import { OrdersNotificationsService } from './orders-notifications.service';
-import { CreateOrdersNotificationDto } from './dto/create-orders-notification.dto';
-import { UpdateOrdersNotificationDto } from './dto/update-orders-notification.dto';
+import { OrderAvailableNotificationDto } from './dto/orders-notification.dto';
+import { WsJwtGuard } from '../auth/guards/ws-jwt.guard';
+import { WsRolesGuard } from '../auth/guards/ws-roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { SocketWithUser } from './types/socket-user.interface';
+import { WebsocketExceptionFilter } from '../common/filters/websocket-exception.filter';
+import { OrdersConnectionHandler } from './orders-connection.handler';
 
-@WebSocketGateway()
+@WebSocketGateway({ cors: true })
+@UseGuards(WsJwtGuard, WsRolesGuard)
+@UseFilters(WebsocketExceptionFilter)
 export class OrdersNotificationsGateway {
+  @WebSocketServer()
+  server: Server;
+
   constructor(
-    private readonly ordersNotificationsService: OrdersNotificationsService,
+    private readonly notifications: OrdersNotificationsService,
+    private readonly connectionHandler: OrdersConnectionHandler,
   ) {}
 
-  @SubscribeMessage('createOrdersNotification')
-  create(
-    @MessageBody() createOrdersNotificationDto: CreateOrdersNotificationDto,
-  ) {
-    return this.ordersNotificationsService.create(createOrdersNotificationDto);
+  handleConnection(client: SocketWithUser) {
+    this.connectionHandler.handleConnection(client);
   }
 
-  @SubscribeMessage('findAllOrdersNotifications')
-  findAll() {
-    return this.ordersNotificationsService.findAll();
+  handleDisconnect(client: SocketWithUser) {
+    this.connectionHandler.handleDisconnect(client);
   }
 
-  @SubscribeMessage('findOneOrdersNotification')
-  findOne(@MessageBody() id: number) {
-    return this.ordersNotificationsService.findOne(id);
+  @Roles(Role.driver)
+  @SubscribeMessage('subscribeNewOrders')
+  handleDriverSubscribe(@ConnectedSocket() client: SocketWithUser) {
+    return this.connectionHandler.handleDriverSubscribe(client);
   }
 
-  @SubscribeMessage('updateOrdersNotification')
-  update(
-    @MessageBody() updateOrdersNotificationDto: UpdateOrdersNotificationDto,
-  ) {
-    return this.ordersNotificationsService.update(
-      updateOrdersNotificationDto.id,
-      updateOrdersNotificationDto,
-    );
-  }
-
-  @SubscribeMessage('removeOrdersNotification')
-  remove(@MessageBody() id: number) {
-    return this.ordersNotificationsService.remove(id);
+  broadcastNewOrderAvailable(notification: OrderAvailableNotificationDto) {
+    this.server.to('drivers').emit('newOrderNotification', notification);
   }
 }

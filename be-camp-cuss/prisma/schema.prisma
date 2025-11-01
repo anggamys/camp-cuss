@@ -5,7 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
@@ -14,36 +14,102 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model users {
-  id                      Int         @id @default(autoincrement())
-  username                String      @unique
-  email                   String      @unique
-  npm                     String
-  no_phone                String
-  password                String
-  role                    Role        @default(customer)
-  photo_profile           String?
-  photo_id_card           String?
-  photo_student_card      String?
-  photo_driving_license   String?
-  refresh_token           String?
-  created_at              DateTime    @default(now())
-  updated_at              DateTime    @updatedAt
+model User {
+  id                    Int              @id @default(autoincrement())
+  username              String           @unique
+  email                 String           @unique
+  npm                   String
+  no_phone              String
+  password              String
+  role                  UserRole         @default(customer)
+  driver_status         DriverStatus?    @default(pending)
+  photo_profile         String?
+  photo_id_card         String?
+  photo_student_card    String?
+  photo_driving_license String?
+  refresh_token         String?
+  created_at            DateTime         @default(now())
+  updated_at            DateTime         @updatedAt
+
+  driverRequests        DriverRequest[]
+  ordersAsCustomer      Order[]          @relation("UserOrders")
+  ordersAsDriver        Order[]          @relation("DriverOrders")
+  approvedDriverRequests DriverRequest[] @relation("AdminApprover")
+
+  @@map("users")
 }
 
-model destinations {
-  id            Int         @id @default(autoincrement())
-  name          String      @unique
-  image_place   String?
-  latitude      Float
-  longitude     Float
-  estimated     Int
-  created_at    DateTime    @default(now())
-  updated_at    DateTime    @updatedAt
+model DriverRequest {
+  id           Int             @id @default(autoincrement())
+  user_id      Int
+  user         User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  status       ApprovalStatus  @default(pending)
+  user_notes   String?         // alasan user ingin menjadi driver
+  admin_notes  String?         // catatan admin saat approve/reject
+  approved_by  Int?            // id admin yang memproses
+  admin        User?           @relation("AdminApprover", fields: [approved_by], references: [id])
+  created_at   DateTime        @default(now())
+  updated_at   DateTime        @updatedAt
+
+  @@map("driver_requests")
+  @@index([status])
+  @@index([user_id])
 }
 
-enum Role {
+model Destination {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  image_place String?
+  estimated   Int
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  orders      Order[]
+
+  @@map("destinations")
+}
+
+model Order {
+  id                Int          @id @default(autoincrement())
+  user_id           Int
+  driver_id         Int?
+  destination_id    Int
+  pick_up_location  String
+  pick_up_latitude  Float
+  pick_up_longitude Float
+  status            OrderStatus  @default(pending)
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  user              User         @relation("UserOrders", fields: [user_id], references: [id])
+  driver            User?        @relation("DriverOrders", fields: [driver_id], references: [id])
+  destination       Destination  @relation(fields: [destination_id], references: [id])
+
+  @@map("orders")
+}
+
+enum UserRole {
   customer
   driver
   admin
+}
+
+enum DriverStatus {
+  pending
+  approved
+  rejected
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum OrderStatus {
+  pending
+  accepted
+  on_progress
+  completed
+  cancelled
 }

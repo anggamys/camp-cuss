@@ -27,16 +27,16 @@ export class AuthService {
 
     const hashedPassword = await PasswordHelper.hash(registerDto.password);
 
-    return this.prisma.users.create({
+    return this.prisma.user.create({
       data: { ...registerDto, password: hashedPassword },
-      select: { id: true, email: true },
+      select: { id: true, email: true, username: true },
     });
   }
 
   async login(loginDto: loginDto): Promise<responseLoginDto> {
     const { username, password } = loginDto;
 
-    const user = await this.prisma.users.findUnique({ where: { username } });
+    const user = await this.prisma.user.findUnique({ where: { username } });
     if (!user)
       throw new HttpException('Pengguna tidak ditemukan', HttpStatus.NOT_FOUND);
 
@@ -52,6 +52,7 @@ export class AuthService {
       this.config,
       user,
     );
+
     const refreshToken = await TokenHelper.generateRefreshToken(
       this.jwt,
       this.config,
@@ -60,7 +61,7 @@ export class AuthService {
 
     const hashedRefresh = await PasswordHelper.hash(refreshToken);
 
-    await this.prisma.users.update({
+    await this.prisma.user.update({
       where: { id: user.id },
       data: { refresh_token: hashedRefresh },
     });
@@ -82,7 +83,7 @@ export class AuthService {
       const userId =
         typeof decoded.sub === 'string' ? Number(decoded.sub) : decoded.sub;
 
-      const user = await this.prisma.users.findUnique({
+      const user = await this.prisma.user.findUnique({
         where: { id: userId },
       });
       if (!user || !user.refresh_token)
@@ -109,7 +110,7 @@ export class AuthService {
 
       const hashedRefresh = await PasswordHelper.hash(newRefreshToken);
 
-      await this.prisma.users.update({
+      await this.prisma.user.update({
         where: { id: user.id },
         data: { refresh_token: hashedRefresh },
       });
@@ -140,7 +141,7 @@ export class AuthService {
     try {
       console.log('Logging out user with ID:', userId);
 
-      await this.prisma.users.update({
+      await this.prisma.user.update({
         where: { id: userId },
         data: { refresh_token: null },
       });
@@ -157,8 +158,8 @@ export class AuthService {
 
   private async validateUniqueFields(email: string, username: string) {
     const [emailExists, usernameExists] = await Promise.all([
-      this.prisma.users.findUnique({ where: { email } }),
-      this.prisma.users.findUnique({ where: { username } }),
+      this.prisma.user.findUnique({ where: { email } }),
+      this.prisma.user.findUnique({ where: { username } }),
     ]);
 
     if (emailExists || usernameExists) {

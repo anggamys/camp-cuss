@@ -10,6 +10,8 @@ import {
   TokenExpiredError,
   NotBeforeError,
 } from 'jsonwebtoken';
+import { Reflector } from '@nestjs/core';
+import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { UserPayload } from '../../common/types/user-context.interface';
 import { ApiResponse } from '../../common/types/api-response.interface';
 
@@ -22,6 +24,22 @@ interface RequestWithHeaders {
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  constructor(private readonly reflector: Reflector) {
+    super();
+  }
+
+  canActivate(context: ExecutionContext) {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    // Jika route publik, lewati guard
+    if (isPublic) return true;
+
+    return super.canActivate(context);
+  }
+
   handleRequest<TUser = UserPayload>(
     err: unknown,
     user: TUser | false,
@@ -36,26 +54,27 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       throw new UnauthorizedException(
         this.buildError('Token tidak disertakan', {
           token: [
-            'Header Authorization dengan format Bearer <token> wajib dikirim',
+            'Header Authorization dengan format Bearer <token> diperlukan',
           ],
         }),
       );
     }
 
-    // 2. Header ada tapi kosong (Bearer saja tanpa token)
+    // 2. Header ada tapi kosong
     if (typeof authHeader === 'string' && authHeader.trim() === 'Bearer') {
       throw new UnauthorizedException(
         this.buildError('Token tidak disertakan', {
-          token: ['Token tidak boleh kosong'],
+          token: ['Token tidak boleh kosong setelah kata Bearer'],
         }),
       );
     }
 
-    // 3. Token tidak valid (signature atau format rusak)
+    // 3. Token tidak valid
     if (info instanceof JsonWebTokenError) {
+      const friendlyMessage = this.getFriendlyJwtErrorMessage(info.message);
       throw new UnauthorizedException(
         this.buildError('Token tidak valid', {
-          token: [info.message],
+          token: [friendlyMessage],
         }),
       );
     }
@@ -64,7 +83,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (info instanceof TokenExpiredError) {
       throw new UnauthorizedException(
         this.buildError('Token telah kedaluwarsa', {
-          token: ['Silakan login ulang untuk mendapatkan token baru'],
+          token: [
+            'Sesi Anda telah berakhir, silakan login ulang untuk melanjutkan',
+          ],
         }),
       );
     }
@@ -78,11 +99,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       );
     }
 
-    // 6. User tidak ditemukan (JWT valid tapi data user tidak ada)
+    // 6. User tidak ditemukan
     if (!user) {
       throw new UnauthorizedException(
         this.buildError('User tidak ditemukan', {
-          auth: ['Data pengguna tidak ditemukan dari token'],
+          auth: [
+            'Akun tidak ditemukan atau telah dihapus, silakan hubungi admin',
+          ],
         }),
       );
     }
@@ -91,7 +114,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (err) {
       throw new UnauthorizedException(
         this.buildError('Autentikasi gagal', {
-          auth: ['Gagal memverifikasi identitas pengguna'],
+          auth: ['Terjadi kesalahan saat memverifikasi identitas Anda'],
         }),
       );
     }
@@ -110,5 +133,30 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       errors,
       meta: null,
     };
+  }
+
+  private getFriendlyJwtErrorMessage(originalMessage: string): string {
+    const errorMappings: Record<string, string> = {
+      'jwt malformed': 'Format token tidak valid atau rusak',
+      'invalid token': 'Token tidak valid',
+      'invalid signature': 'Tanda tangan token tidak valid',
+      'jwt signature is required': 'Tanda tangan token diperlukan',
+      'invalid algorithm': 'Algoritma token tidak didukung',
+      'jwt audience invalid': 'Audience token tidak valid',
+      'jwt issuer invalid': 'Penerbit token tidak valid',
+      'jwt id invalid': 'ID token tidak valid',
+      'jwt subject invalid': 'Subject token tidak valid',
+    };
+
+    // Cari pesan yang cocok (case-insensitive)
+    const lowerOriginal = originalMessage.toLowerCase();
+    for (const [key, value] of Object.entries(errorMappings)) {
+      if (lowerOriginal.includes(key)) {
+        return value;
+      }
+    }
+
+    // Jika tidak ada yang cocok, kembalikan pesan default
+    return 'Token tidak dapat diverifikasi, silakan login ulang';
   }
 }

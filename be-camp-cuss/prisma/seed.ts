@@ -1,14 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
-import { UsersService } from '../src/users/users.service';
+import { UsersService } from '../src/users/services/users.service';
+import { DestinationsService } from '../src/destinations/destinations.service';
+import { StoragesService } from '../src/storages/storages.service';
 import { CreateUserDto } from '../src/users/dto/create-user.dto';
 import { CreateDestinationDto } from '../src/destinations/dto/create-destination.dto';
-import { DestinationsService } from '../src/destinations/destinations.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
   const usersService = app.get(UsersService);
   const destinationsService = app.get(DestinationsService);
+  const storagesService = app.get(StoragesService);
 
   const seedUsers: Partial<CreateUserDto>[] = [
     {
@@ -37,43 +41,100 @@ async function bootstrap() {
     },
   ];
 
-  const seedDestinations: Partial<CreateDestinationDto>[] = [
+  const seedDestinations: Partial<
+    CreateDestinationDto & { imageFile: string }
+  >[] = [
     {
       name: 'Fakultas Ilmu Komputer',
       latitude: -7.334667,
       longitude: 112.788194,
       estimated: 15,
-      image_place: null,
+      imageFile: 'fasilkom.png',
+    },
+    {
+      name: 'Gedung Rektorat',
+      latitude: -7.334667,
+      longitude: 112.788194,
+      estimated: 15,
+      imageFile: 'Rektorat_UPN_Jatim.jpg',
+    },
+    {
+      name: 'Fakultas Kedokteran',
+      latitude: -7.334667,
+      longitude: 112.788194,
+      estimated: 15,
+      imageFile: 'fk.jpg',
+    },
+    {
+      name: 'Giri Pustaka',
+      latitude: -7.334667,
+      longitude: 112.788194,
+      estimated: 15,
+      imageFile: 'giri-pustaka.jpg',
+    },
+    {
+      name: 'Fakultas Ekonomi dan Bisnis',
+      latitude: -7.334667,
+      longitude: 112.788194,
+      estimated: 15,
+      imageFile: 'feb.jpeg',
+    },
+    {
+      name: 'Gedung Kuliah Bersama',
+      latitude: -7.334667,
+      longitude: 112.788194,
+      estimated: 15,
+      imageFile: 'gkb.jpg',
+    },
+    {
+      name: 'Tekno Park',
+      latitude: -7.334667,
+      longitude: 112.788194,
+      estimated: 15,
+      imageFile: 'tekno-park.jpg',
     },
   ];
 
   try {
-    try {
-      await destinationsService['prisma'].destinations.deleteMany();
-      await usersService['prisma'].users.deleteMany();
-      console.log('Semua data berhasil dihapus.');
-    } catch (error) {
-      console.error('Gagal menghapus data:', error);
-    }
+    await destinationsService['prisma'].destinations.deleteMany();
+    await usersService['prisma'].users.deleteMany();
+    console.log('Semua data berhasil dihapus.');
 
     for (const user of seedUsers) {
-      try {
-        await usersService.create(user as CreateUserDto);
-        console.log(`User ${user.username} berhasil dibuat`);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.log(`User ${user.username} dilewati: ${message}`);
-      }
+      await usersService.create(user as CreateUserDto);
+      console.log(`User ${user.username} berhasil dibuat`);
     }
 
     for (const destination of seedDestinations) {
-      try {
-        await destinationsService.create(destination as CreateDestinationDto);
-        console.log(`Destination ${destination.name} berhasil dibuat`);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.log(`Destination ${destination.name} dilewati: ${message}`);
+      let imageKey: string | null = null;
+
+      if (destination.imageFile) {
+        const filePath = path.join(__dirname, 'assets', destination.imageFile);
+        const fileBuffer = fs.readFileSync(filePath);
+
+        // Upload ke Supabase storage
+        const uploaded = await storagesService.upload(
+          {
+            buffer: fileBuffer,
+            originalname: destination.imageFile,
+            mimetype: 'image/jpeg',
+          } as Express.Multer.File,
+          'destinations',
+          false,
+        );
+
+        imageKey = uploaded.key;
       }
+
+      await destinationsService.create({
+        name: destination.name!,
+        latitude: destination.latitude!,
+        longitude: destination.longitude!,
+        estimated: destination.estimated!,
+        image_place: imageKey ?? null,
+      });
+
+      console.log(`Destination ${destination.name} berhasil dibuat`);
     }
   } catch (error) {
     console.error('Gagal menjalankan seeder:', error);
