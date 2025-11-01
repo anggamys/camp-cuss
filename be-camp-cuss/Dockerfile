@@ -11,11 +11,8 @@ RUN npm ci --ignore-scripts --no-audit --prefer-offline
 
 COPY . .
 
-# Gunakan npx untuk memastikan CLI lokal dipakai
-RUN rm -rf prisma/migrations && \
-    npx prisma migrate deploy && \
-    npx nest build && \
-    test -f dist/main.js
+# Hanya build kode (tanpa prisma migrate)
+RUN npx prisma generate && npx nest build && test -f dist/main.js
 
 ENV NODE_ENV=production
 RUN npm prune --omit=dev && npm cache clean --force
