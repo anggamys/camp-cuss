@@ -7,7 +7,7 @@ import {
   IsString,
 } from 'class-validator';
 
-export class CreateOrderDto {
+export class OrderAvailableNotificationDto {
   @IsNotEmpty({ message: 'User ID tidak boleh kosong' })
   @IsNumber({}, { message: 'User ID harus berupa angka' })
   user_id: number;
@@ -35,17 +35,4 @@ export class CreateOrderDto {
   @IsOptional()
   @IsEnum(OrderStatus, { message: 'Status order tidak valid' })
   status?: OrderStatus;
-}
-
-export class CreateOrderResponseDto {
-  id: number;
-  user_id: number;
-  driver_id: number | null;
-  destination_id: number;
-  pick_up_location: string;
-  pick_up_latitude: number;
-  pick_up_longitude: number;
-  status: OrderStatus;
-  created_at: Date;
-  updated_at: Date;
 }

@@ -12,9 +12,9 @@ RUN npm ci --ignore-scripts --no-audit --prefer-offline
 COPY . .
 
 # Gunakan npx untuk memastikan CLI lokal dipakai
-RUN npx prisma generate --schema=./prisma/schema.prisma && \
+RUN rm -rf prisma/migrations && \
+    npx prisma migrate deploy && \
     npx nest build && \
-    echo "=== isi folder dist ===" && ls -la dist && \
     test -f dist/main.js
 
 ENV NODE_ENV=production

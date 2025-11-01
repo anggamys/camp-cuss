@@ -1,5 +1,5 @@
 import { IsEmail, IsString, IsOptional, IsEnum } from 'class-validator';
-import { Role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { IsInt } from 'class-validator';
 
 export class UpdateUserDto {
@@ -23,9 +23,9 @@ export class UpdateUserDto {
   @IsOptional()
   no_phone?: string;
 
-  @IsEnum(Role, { message: 'Role tidak valid' })
   @IsOptional()
-  role?: Role;
+  @IsEnum(UserRole, { message: 'Role tidak valid' })
+  role?: UserRole;
 
   @IsString({ message: 'KTM harus berupa string' })
   @IsOptional()
@@ -64,6 +64,6 @@ export class UpdateUserResponseDto {
   @IsString({ message: 'Nomor telepon harus berupa string' })
   no_phone: string;
 
-  @IsEnum(Role, { message: 'Role tidak valid' })
-  role: Role;
+  @IsEnum(UserRole, { message: 'Role tidak valid' })
+  role: UserRole;
 }

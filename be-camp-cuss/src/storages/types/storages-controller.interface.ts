@@ -1,15 +1,17 @@
+export type UserPhotoField =
+  | 'photo_profile'
+  | 'photo_id_card'
+  | 'photo_student_card'
+  | 'photo_driving_license';
+
 export interface UploadConfig {
+  field: UserPhotoField;
   folder: string;
   isPrivate: boolean;
-  oldKey?: string | null;
-  update: (
-    uid: number,
-    fileKey: string,
-  ) => Promise<{ id: number; [key: string]: any }>;
 }
 
 export interface UploadResponse {
-  status: string;
+  status: 'success' | 'error';
   message: string;
-  data: { id: number; [key: string]: any };
+  data?: any;
 }

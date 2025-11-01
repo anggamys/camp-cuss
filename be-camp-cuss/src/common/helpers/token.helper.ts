@@ -1,6 +1,6 @@
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { users } from '@prisma/client';
+import { User } from '@prisma/client';
 import { JwtEnvKeys } from '../enums/env-keys.enum';
 
 interface JwtPayload {
@@ -12,7 +12,7 @@ interface JwtPayload {
 
 export class TokenHelper {
   // Bangun payload JWT
-  private static buildPayload(user: users): JwtPayload {
+  private static buildPayload(user: User): JwtPayload {
     return {
       sub: user.id,
       id: user.id,
@@ -46,7 +46,7 @@ export class TokenHelper {
   static async generateAccessToken(
     jwt: JwtService,
     config: ConfigService,
-    user: users,
+    user: User,
   ): Promise<string> {
     const payload = this.buildPayload(user);
 
@@ -62,7 +62,7 @@ export class TokenHelper {
   static async generateRefreshToken(
     jwt: JwtService,
     config: ConfigService,
-    user: users,
+    user: User,
   ): Promise<string> {
     const payload = this.buildPayload(user);
 

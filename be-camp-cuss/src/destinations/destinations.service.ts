@@ -13,7 +13,7 @@ import {
 } from './dto/update-destination.dto';
 import { PrismaService } from '../prisma/prisma.services';
 import { PrismaErrorHelper } from '../common/helpers/prisma-error.helper';
-import { destinations, Prisma } from '@prisma/client';
+import { Destination, Prisma } from '@prisma/client';
 import { StoragesService } from '../storages/storages.service';
 
 @Injectable()
@@ -27,7 +27,7 @@ export class DestinationsService {
     dto: CreateDestinationDto,
   ): Promise<responseCreateDestinationDto> {
     try {
-      const exists = await this.prisma.destinations.findUnique({
+      const exists = await this.prisma.destination.findUnique({
         where: { name: dto.name },
       });
 
@@ -38,7 +38,7 @@ export class DestinationsService {
         });
       }
 
-      const created = await this.prisma.destinations.create({ data: dto });
+      const created = await this.prisma.destination.create({ data: dto });
 
       if (created.image_place) {
         const imagePlaceUrl = this.storages.buildPublicUrl(created.image_place);
@@ -56,22 +56,22 @@ export class DestinationsService {
     search?: string,
     page = 1,
     limit = 10,
-  ): Promise<{ data: destinations[]; meta: any }> {
+  ): Promise<{ data: Destination[]; meta: any }> {
     try {
       const skip = (page - 1) * limit;
 
-      const where: Prisma.destinationsWhereInput = search
+      const where: Prisma.DestinationWhereInput = search
         ? { name: { contains: search, mode: 'insensitive' } }
         : {};
 
       const [data, total] = await Promise.all([
-        this.prisma.destinations.findMany({
+        this.prisma.destination.findMany({
           where,
           skip,
           take: limit,
           orderBy: { name: 'asc' },
         }),
-        this.prisma.destinations.count({ where }),
+        this.prisma.destination.count({ where }),
       ]);
 
       if (data.length === 0) {
@@ -102,9 +102,9 @@ export class DestinationsService {
     }
   }
 
-  async findOne(id: number): Promise<destinations> {
+  async findOne(id: number): Promise<Destination> {
     try {
-      const destination = await this.prisma.destinations.findUnique({
+      const destination = await this.prisma.destination.findUnique({
         where: { id },
       });
 
@@ -133,7 +133,7 @@ export class DestinationsService {
   ): Promise<responseUpdateDestinationDto> {
     const { id, ...data } = dto;
     try {
-      const existing = await this.prisma.destinations.findUnique({
+      const existing = await this.prisma.destination.findUnique({
         where: { id },
       });
       if (!existing) {
@@ -144,7 +144,7 @@ export class DestinationsService {
       }
 
       if (data.name && data.name !== existing.name) {
-        const nameUsed = await this.prisma.destinations.findFirst({
+        const nameUsed = await this.prisma.destination.findFirst({
           where: { name: data.name },
         });
         if (nameUsed) {
@@ -155,7 +155,7 @@ export class DestinationsService {
         }
       }
 
-      const updated = await this.prisma.destinations.update({
+      const updated = await this.prisma.destination.update({
         where: { id },
         data,
       });
@@ -173,9 +173,9 @@ export class DestinationsService {
   async updateImagePlace(
     id: number,
     image_place: string,
-  ): Promise<destinations> {
+  ): Promise<Destination> {
     try {
-      const existing = await this.prisma.destinations.findUnique({
+      const existing = await this.prisma.destination.findUnique({
         where: { id },
       });
 
@@ -186,7 +186,7 @@ export class DestinationsService {
         });
       }
 
-      const updated = await this.prisma.destinations.update({
+      const updated = await this.prisma.destination.update({
         where: { id },
         data: { image_place },
       });
@@ -203,7 +203,7 @@ export class DestinationsService {
 
   async remove(id: number): Promise<{ message: string }> {
     try {
-      const exists = await this.prisma.destinations.findUnique({
+      const exists = await this.prisma.destination.findUnique({
         where: { id },
       });
       if (!exists) {
@@ -217,7 +217,7 @@ export class DestinationsService {
         await this.storages.delete(exists.image_place, true);
       }
 
-      await this.prisma.destinations.delete({ where: { id } });
+      await this.prisma.destination.delete({ where: { id } });
       return { message: `Destinasi dengan ID ${id} berhasil dihapus` };
     } catch (error) {
       PrismaErrorHelper.handle(error);

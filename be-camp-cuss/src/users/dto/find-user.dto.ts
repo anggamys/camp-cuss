@@ -1,3 +1,4 @@
+import { UserRole } from '@prisma/client';
 import { IsOptional, IsInt, IsString, IsEmail, Matches } from 'class-validator';
 
 export class FindUserResponseDto {
@@ -23,7 +24,7 @@ export class FindUserResponseDto {
 
   @IsOptional()
   @IsString({ message: 'Role harus berupa teks' })
-  role?: string;
+  role?: UserRole;
 
   @IsOptional()
   @IsString({ message: 'Foto profil harus berupa teks' })

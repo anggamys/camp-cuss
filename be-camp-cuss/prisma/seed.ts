@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
-import { UsersService } from '../src/users/users.service';
+import { UsersService } from '../src/users/services/users.service';
 import { DestinationsService } from '../src/destinations/destinations.service';
 import { StoragesService } from '../src/storages/storages.service';
 import { CreateUserDto } from '../src/users/dto/create-user.dto';

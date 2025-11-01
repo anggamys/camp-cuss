@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +8,7 @@ import {
   UserPayload,
 } from '../../common/types/user-context.interface';
 import { JwtEnvKeys } from '../../common/enums/env-keys.enum';
+import { ApiResponse } from '../../common/types/api-response.interface';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -31,16 +32,24 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload): Promise<UserPayload> {
-    const user = await this.prisma.users.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true, username: true, role: true },
     });
 
     if (!user) {
-      throw new HttpException(
-        'Pengguna tidak ditemukan',
-        HttpStatus.UNAUTHORIZED,
-      );
+      const errorResponse: ApiResponse<null> = {
+        status: 'error',
+        message: 'Pengguna tidak ditemukan atau token tidak valid',
+        data: null,
+        errors: {
+          auth: [
+            'Token valid tetapi data pengguna tidak ditemukan di database',
+          ],
+        },
+        meta: null,
+      };
+      throw new UnauthorizedException(errorResponse);
     }
 
     return {

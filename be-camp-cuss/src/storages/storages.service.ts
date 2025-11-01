@@ -5,7 +5,6 @@ import {
 } from '@aws-sdk/client-s3';
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -52,25 +51,74 @@ export class StoragesService {
     if (!file)
       throw new HttpException('File wajib diunggah', HttpStatus.BAD_REQUEST);
 
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new HttpException(
+        'Ukuran file terlalu besar. Maksimal 10MB',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     const bucket = isPrivate ? this.bucketPrivate : this.bucketPublic;
     const fileKey = this.generateFileKey(targetPath, file.originalname);
+
+    let fileBuffer = file.buffer;
+
+    if (this.isImage(file.mimetype)) {
+      try {
+        // Validate image buffer
+        if (!file.buffer || file.buffer.length === 0) {
+          throw new Error('Buffer gambar kosong atau tidak valid');
+        }
+
+        // Dynamic import for Sharp to handle module loading issues
+        const sharp = (await import('sharp')).default;
+
+        const sharpInstance = sharp(file.buffer).resize({
+          width: 1280,
+          withoutEnlargement: true,
+        }); // resize maksimal 1280px
+
+        // Convert to JPEG for consistency and better compression
+        // except for PNG with transparency which we'll keep as PNG
+        if (file.mimetype === 'image/png') {
+          fileBuffer = await sharpInstance
+            .png({ quality: 80, compressionLevel: 6 })
+            .toBuffer();
+        } else {
+          fileBuffer = await sharpInstance.jpeg({ quality: 80 }).toBuffer();
+        }
+      } catch (error) {
+        const errorMsg = this.getErrorMessage(error);
+        const fileInfo = this.getFileInfo(file);
+
+        // Log the error for debugging but don't fail the upload
+        console.error(`Image compression failed for ${fileInfo}: ${errorMsg}`);
+
+        // Use original file buffer as fallback
+        console.log('Using original file buffer as fallback');
+        fileBuffer = file.buffer;
+      }
+    }
 
     try {
       await this.s3.send(
         new PutObjectCommand({
           Bucket: bucket,
           Key: fileKey,
-          Body: file.buffer,
+          Body: fileBuffer,
           ContentType: file.mimetype,
           ACL: isPrivate ? undefined : 'public-read',
         }),
       );
 
-      // hanya return key, tanpa URL
       return { key: fileKey };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : JSON.stringify(err);
-      throw new HttpException(`Upload gagal: ${msg}`, HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        `Upload gagal: ${this.getErrorMessage(err)}`,
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 
@@ -82,9 +130,8 @@ export class StoragesService {
         new DeleteObjectCommand({ Bucket: bucket, Key: fileKey }),
       );
     } catch (err) {
-      const msg = err instanceof Error ? err.message : JSON.stringify(err);
       throw new HttpException(
-        `Hapus file gagal: ${msg}`,
+        `Hapus file gagal: ${this.getErrorMessage(err)}`,
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -131,5 +178,26 @@ export class StoragesService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     return value;
+  }
+
+  private isImage(mime: string): boolean {
+    const supportedFormats = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'image/tiff',
+      'image/bmp',
+    ];
+    return supportedFormats.includes(mime.toLowerCase());
+  }
+
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : JSON.stringify(error);
+  }
+
+  private getFileInfo(file: Express.Multer.File): string {
+    return `${file.originalname} (${file.mimetype}, ${file.size} bytes)`;
   }
 }

@@ -1,8 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateDestinationDto } from './create-destination.dto';
 import {
-  IsLatitude,
-  IsLongitude,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -27,14 +25,6 @@ export class responseUpdateDestinationDto {
   @IsString({ message: 'image_place harus berupa string' })
   @IsOptional()
   image_place: string | null;
-
-  @IsNumber({}, { message: 'latitude harus berupa angka' })
-  @IsLatitude({ message: 'latitude harus berupa nilai lintang yang valid' })
-  latitude: number;
-
-  @IsNumber({}, { message: 'longitude harus berupa angka' })
-  @IsLongitude({ message: 'longitude harus berupa nilai bujur yang valid' })
-  longitude: number;
 
   @IsNumber({}, { message: 'estimated harus berupa angka' })
   @Min(0, { message: 'estimated harus bernilai minimal 0' })
