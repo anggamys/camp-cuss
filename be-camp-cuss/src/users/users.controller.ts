@@ -31,6 +31,7 @@ export class UsersController {
   @Post()
   async create(@Body() dto: CreateUserDto) {
     const user = await this.usersService.create(dto);
+
     return { message: 'Pengguna dibuat', data: user };
   }
 
@@ -70,7 +71,13 @@ export class UsersController {
     @Body() dto: ApproveDriverRequestDto,
     @User('id') adminId: number,
   ) {
-    return await this.approvalService.approveRequest(requestId, adminId, dto);
+    const result = await this.approvalService.approveRequest(
+      requestId,
+      adminId,
+      dto,
+    );
+
+    return { message: 'Permintaan driver disetujui', data: result };
   }
 
   @Get(':id')

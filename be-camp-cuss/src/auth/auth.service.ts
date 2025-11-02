@@ -23,50 +23,71 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<RegisterUserResponseDto> {
-    await this.validateUniqueFields(registerDto.email, registerDto.username);
+    try {
+      await this.validateUniqueFields(registerDto.email, registerDto.username);
 
-    const hashedPassword = await PasswordHelper.hash(registerDto.password);
+      const hashedPassword = await PasswordHelper.hash(registerDto.password);
 
-    return this.prisma.user.create({
-      data: { ...registerDto, password: hashedPassword },
-      select: { id: true, email: true, username: true },
-    });
+      const user = await this.prisma.user.create({
+        data: { ...registerDto, password: hashedPassword },
+        select: { id: true, email: true, username: true },
+      });
+
+      return user;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException(
+        'Gagal mendaftarkan pengguna',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   async login(loginDto: loginDto): Promise<responseLoginDto> {
-    const { username, password } = loginDto;
+    try {
+      const { username, password } = loginDto;
 
-    const user = await this.prisma.user.findUnique({ where: { username } });
-    if (!user)
-      throw new HttpException('Pengguna tidak ditemukan', HttpStatus.NOT_FOUND);
+      const user = await this.prisma.user.findUnique({ where: { username } });
+      if (!user)
+        throw new HttpException(
+          'Pengguna tidak ditemukan',
+          HttpStatus.NOT_FOUND,
+        );
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid)
-      throw new HttpException(
-        'Kredensial tidak valid',
-        HttpStatus.UNAUTHORIZED,
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid)
+        throw new HttpException(
+          'Kredensial tidak valid',
+          HttpStatus.UNAUTHORIZED,
+        );
+
+      const accessToken = await TokenHelper.generateAccessToken(
+        this.jwt,
+        this.config,
+        user,
       );
 
-    const accessToken = await TokenHelper.generateAccessToken(
-      this.jwt,
-      this.config,
-      user,
-    );
+      const refreshToken = await TokenHelper.generateRefreshToken(
+        this.jwt,
+        this.config,
+        user,
+      );
 
-    const refreshToken = await TokenHelper.generateRefreshToken(
-      this.jwt,
-      this.config,
-      user,
-    );
+      const hashedRefresh = await PasswordHelper.hash(refreshToken);
 
-    const hashedRefresh = await PasswordHelper.hash(refreshToken);
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { refresh_token: hashedRefresh },
+      });
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { refresh_token: hashedRefresh },
-    });
-
-    return { access_token: accessToken, refresh_token: refreshToken };
+      return { access_token: accessToken, refresh_token: refreshToken };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException(
+        'Gagal melakukan login',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   async refreshToken(
@@ -86,6 +107,7 @@ export class AuthService {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
       });
+
       if (!user || !user.refresh_token)
         throw new HttpException(
           'Refresh token tidak ditemukan',
@@ -96,6 +118,7 @@ export class AuthService {
         refresh_token,
         user.refresh_token,
       );
+
       if (!isValid)
         throw new HttpException(
           'Refresh token tidak valid',
@@ -128,11 +151,13 @@ export class AuthService {
           'Refresh token telah kedaluwarsa',
           HttpStatus.UNAUTHORIZED,
         );
+
       if (err instanceof JsonWebTokenError)
         throw new HttpException(
           'Refresh token tidak valid',
           HttpStatus.UNAUTHORIZED,
         );
+
       throw new HttpException('Kesalahan otentikasi', HttpStatus.UNAUTHORIZED);
     }
   }
@@ -157,21 +182,29 @@ export class AuthService {
   }
 
   private async validateUniqueFields(email: string, username: string) {
-    const [emailExists, usernameExists] = await Promise.all([
-      this.prisma.user.findUnique({ where: { email } }),
-      this.prisma.user.findUnique({ where: { username } }),
-    ]);
+    try {
+      const [emailExists, usernameExists] = await Promise.all([
+        this.prisma.user.findUnique({ where: { email } }),
+        this.prisma.user.findUnique({ where: { username } }),
+      ]);
 
-    if (emailExists || usernameExists) {
-      throw new HttpException(
-        {
-          message: 'Validasi gagal',
-          errors: {
-            email: emailExists ? 'Email sudah digunakan' : undefined,
-            username: usernameExists ? 'Username sudah digunakan' : undefined,
+      if (emailExists || usernameExists) {
+        throw new HttpException(
+          {
+            message: 'Validasi gagal',
+            errors: {
+              email: emailExists ? 'Email sudah digunakan' : undefined,
+              username: usernameExists ? 'Username sudah digunakan' : undefined,
+            },
           },
-        },
-        HttpStatus.BAD_REQUEST,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new HttpException(
+        'Gagal memvalidasi data pengguna',
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }

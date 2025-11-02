@@ -44,12 +44,12 @@ export class UsersService {
       const users = await this.prisma.user.findMany({
         select: {
           ...this.USER_SELECT,
-          photo_profile: true, // Include photo_profile for URL building
+          photo_profile: true,
         },
       });
 
       if (users.length === 0) {
-        return []; // Return empty array instead of throwing error
+        return [];
       }
 
       // Build URLs for profile photos

@@ -14,8 +14,8 @@ export class AuthController {
   @Post('register')
   async register(@Body() body: RegisterDto) {
     const user = await this.authService.register(body);
+
     return {
-      status: 'success',
       message: 'Registrasi berhasil',
       data: user,
     };
@@ -25,8 +25,8 @@ export class AuthController {
   @Post('login')
   async login(@Body() body: loginDto) {
     const tokens = await this.authService.login(body);
+
     return {
-      status: 'success',
       message: 'Login berhasil',
       data: tokens,
     };
@@ -36,8 +36,8 @@ export class AuthController {
   @Post('refresh-token')
   async refreshToken(@Body() body: refreshTokenDto) {
     const tokens = await this.authService.refreshToken(body);
+
     return {
-      status: 'success',
       message: 'Token berhasil diperbarui',
       data: tokens,
     };
@@ -47,8 +47,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async logout(@User('id') userId: number) {
     await this.authService.logout(userId);
+
     return {
-      status: 'success',
       message: 'Logout berhasil',
       data: null,
     };
