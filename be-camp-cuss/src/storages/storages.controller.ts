@@ -95,19 +95,10 @@ export class StoragesController {
       throw new HttpException('File wajib diunggah', HttpStatus.BAD_REQUEST);
 
     try {
-      const destination = await this.destinations.findOne(id);
-
-      // Hapus file lama (jika ada)
-      if (destination.image_place) {
-        await this.storages
-          .delete(destination.image_place, false)
-          .catch(console.error);
-      }
-
-      const uploaded = await this.storages.upload(file, 'destinations', false);
+      // Delegate upload and DB update to destinations service which expects the file
       const updatedDestination = await this.destinations.updateImagePlace(
         id,
-        uploaded.key,
+        file,
       );
 
       return {
@@ -115,7 +106,8 @@ export class StoragesController {
         message: 'Upload image_place berhasil',
         data: updatedDestination,
       };
-    } catch {
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
       throw new HttpException(
         'Gagal upload file destination',
         HttpStatus.INTERNAL_SERVER_ERROR,

@@ -1,10 +1,10 @@
-import { Type } from 'class-transformer';
 import {
   IsString,
   IsNotEmpty,
   IsNumber,
   Min,
   IsOptional,
+  IsDate,
 } from 'class-validator';
 
 export class CreateDestinationDto {
@@ -12,11 +12,6 @@ export class CreateDestinationDto {
   @IsNotEmpty({ message: 'nama tidak boleh kosong' })
   name: string;
 
-  @IsString({ message: 'image_place harus berupa string' })
-  @IsOptional()
-  image_place: string | null;
-
-  @Type(() => Number)
   @IsNumber({}, { message: 'estimated harus berupa angka' })
   @Min(0, { message: 'estimated harus bernilai minimal 0' })
   estimated: number;
@@ -30,14 +25,19 @@ export class responseCreateDestinationDto {
   @IsNotEmpty({ message: 'nama tidak boleh kosong' })
   name: string;
 
-  @IsString({ message: 'image_place harus berupa string' })
   @IsOptional()
+  @IsString({ message: 'image_place harus berupa string' })
   image_place: string | null;
 
   @IsNumber({}, { message: 'estimated harus berupa angka' })
   @Min(0, { message: 'estimated harus bernilai minimal 0' })
   estimated: number;
 
+  @IsDate()
+  @IsNotEmpty({ message: 'created_at tidak boleh kosong' })
   created_at: Date;
+
+  @IsDate()
+  @IsNotEmpty({ message: 'updated_at tidak boleh kosong' })
   updated_at: Date;
 }

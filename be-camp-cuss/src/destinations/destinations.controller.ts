@@ -25,8 +25,8 @@ export class DestinationsController {
   @Post()
   async create(@Body() dto: CreateDestinationDto) {
     const destination = await this.destinationsService.create(dto);
+
     return {
-      status: 'success',
       message: 'Destinasi berhasil dibuat',
       data: destination,
     };
@@ -35,8 +35,8 @@ export class DestinationsController {
   @Get()
   async findAll() {
     const destinations = await this.destinationsService.findAll();
+
     return {
-      status: 'success',
       message: 'Destinasi berhasil diambil',
       data: destinations,
     };
@@ -45,8 +45,8 @@ export class DestinationsController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const destination = await this.destinationsService.findOne(+id);
+
     return {
-      status: 'success',
       message: 'Destinasi berhasil diambil',
       data: destination,
     };
@@ -55,8 +55,8 @@ export class DestinationsController {
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateDestinationDto) {
     const updated = await this.destinationsService.update({ ...dto, id: +id });
+
     return {
-      status: 'success',
       message: 'Destinasi berhasil diperbarui',
       data: updated,
     };
@@ -65,8 +65,8 @@ export class DestinationsController {
   @Delete(':id')
   async remove(@Param('id') id: string) {
     const result = await this.destinationsService.remove(+id);
+
     return {
-      status: 'success',
       message: 'Destinasi berhasil dihapus',
       data: result,
     };

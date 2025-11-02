@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { User } from '../common/decorators/user.decorator';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,10 +24,10 @@ export class OrdersController {
 
   @Post()
   @Roles(Role.customer)
-  async create(@Body() dto: CreateOrderDto) {
-    const order = await this.ordersService.create(dto);
+  async create(@User('id') customerId: number, @Body() dto: CreateOrderDto) {
+    const order = await this.ordersService.create(customerId, dto);
+
     return {
-      status: 'success',
       message: 'Pesanan berhasil dibuat',
       data: order,
     };
@@ -36,8 +37,8 @@ export class OrdersController {
   @Roles(Role.admin)
   async findAll() {
     const orders = await this.ordersService.findAll();
+
     return {
-      status: 'success',
       message: 'Pesanan berhasil diambil',
       data: orders,
     };
@@ -46,8 +47,8 @@ export class OrdersController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const order = await this.ordersService.findOne(+id);
+
     return {
-      status: 'success',
       message: 'Pesanan berhasil diambil',
       data: order,
     };
@@ -56,8 +57,8 @@ export class OrdersController {
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateOrderDto) {
     const order = await this.ordersService.update(+id, dto);
+
     return {
-      status: 'success',
       message: 'Pesanan berhasil diperbarui',
       data: order,
     };
@@ -67,7 +68,6 @@ export class OrdersController {
   async remove(@Param('id') id: string) {
     await this.ordersService.remove(+id);
     return {
-      status: 'success',
       message: 'Pesanan berhasil dihapus',
       data: null,
     };
@@ -80,8 +80,8 @@ export class OrdersController {
     @Param('driverId') driverId: string,
   ) {
     const order = await this.ordersService.acceptOrder(+id, +driverId);
+
     return {
-      status: 'success',
       message: 'Pesanan berhasil diterima',
       data: order,
     };
