@@ -8,6 +8,10 @@ import {
 } from 'class-validator';
 
 export class OrderAvailableNotificationDto {
+  @IsNotEmpty({ message: 'ID tidak boleh kosong' })
+  @IsNumber({}, { message: 'ID harus berupa angka' })
+  id: number;
+
   @IsNotEmpty({ message: 'User ID tidak boleh kosong' })
   @IsNumber({}, { message: 'User ID harus berupa angka' })
   user_id: number;

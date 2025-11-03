@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { Public } from '../common/decorators/public.decorator';
 
 @Controller('destinations')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -32,6 +33,7 @@ export class DestinationsController {
     };
   }
 
+  @Public()
   @Get()
   async findAll() {
     const destinations = await this.destinationsService.findAll();
@@ -42,6 +44,7 @@ export class DestinationsController {
     };
   }
 
+  @Public()
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const destination = await this.destinationsService.findOne(+id);

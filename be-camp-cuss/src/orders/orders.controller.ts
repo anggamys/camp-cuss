@@ -8,7 +8,7 @@ import {
   Delete,
   UseGuards,
 } from '@nestjs/common';
-import { OrdersService } from './orders.service';
+import { OrdersCoreService } from './services/orders-core.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
@@ -16,11 +16,15 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { User } from '../common/decorators/user.decorator';
+import { OrdersDriverService } from './services/orders-driver.service';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersCoreService,
+    private readonly ordersDriverService: OrdersDriverService,
+  ) {}
 
   @Post()
   @Roles(Role.customer)
@@ -79,7 +83,7 @@ export class OrdersController {
     @Param('id') id: string,
     @Param('driverId') driverId: string,
   ) {
-    const order = await this.ordersService.acceptOrder(+id, +driverId);
+    const order = await this.ordersDriverService.acceptOrder(+id, +driverId);
 
     return {
       message: 'Pesanan berhasil diterima',

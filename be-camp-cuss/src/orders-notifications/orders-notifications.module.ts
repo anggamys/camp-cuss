@@ -6,11 +6,11 @@ import { OrdersConnectionHandler } from './orders-connection.handler';
 
 @Module({
   imports: [AuthModule],
-  exports: [OrdersNotificationsGateway, OrdersNotificationsService],
   providers: [
     OrdersNotificationsGateway,
     OrdersNotificationsService,
     OrdersConnectionHandler,
   ],
+  exports: [OrdersNotificationsGateway, OrdersNotificationsService],
 })
 export class OrdersNotificationsModule {}

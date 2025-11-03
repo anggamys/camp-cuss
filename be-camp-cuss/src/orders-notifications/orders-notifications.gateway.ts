@@ -1,48 +1,106 @@
 import {
   WebSocketGateway,
   WebSocketServer,
-  ConnectedSocket,
   SubscribeMessage,
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayInit,
+  WsException,
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
-import { UseFilters, UseGuards } from '@nestjs/common';
-import { OrdersNotificationsService } from './orders-notifications.service';
-import { OrderAvailableNotificationDto } from './dto/orders-notification.dto';
-import { WsJwtGuard } from '../auth/guards/ws-jwt.guard';
-import { WsRolesGuard } from '../auth/guards/ws-roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '../common/enums/role.enum';
+import { Logger, UseFilters, UseGuards, UseInterceptors } from '@nestjs/common';
 import { SocketWithUser } from './types/socket-user.interface';
-import { WebsocketExceptionFilter } from '../common/filters/websocket-exception.filter';
-import { OrdersConnectionHandler } from './orders-connection.handler';
+import { OrderAvailableNotificationDto } from './dto/orders-notification.dto';
+import { ToggleOrderSubscriptionDto } from './dto/toggle-order-subs.dto';
+import { WsJwtGuard } from '../auth/guards/ws-jwt.guard';
+import { WsGlobalExceptionFilter } from '../common/filters/ws-exception.filter';
+import { WsTransformInterceptor } from '../common/interceptors/ws-transform.interceptor';
 
-@WebSocketGateway({ cors: true })
-@UseGuards(WsJwtGuard, WsRolesGuard)
-@UseFilters(WebsocketExceptionFilter)
-export class OrdersNotificationsGateway {
+@UseGuards(WsJwtGuard)
+@UseFilters(WsGlobalExceptionFilter)
+@UseInterceptors(WsTransformInterceptor)
+@WebSocketGateway({ cors: true, namespace: '/orders' })
+export class OrdersNotificationsGateway implements OnGatewayInit {
+  private readonly logger = new Logger(OrdersNotificationsGateway.name);
+  private serverReady = false;
+  private readonly activeDrivers = new Set<string>();
+
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
-  constructor(
-    private readonly notifications: OrdersNotificationsService,
-    private readonly connectionHandler: OrdersConnectionHandler,
-  ) {}
+  afterInit(server: Server) {
+    this.server = server;
+    this.serverReady = true;
+    this.logger.log('Gateway siap menerima koneksi & broadcast');
+  }
 
   handleConnection(client: SocketWithUser) {
-    this.connectionHandler.handleConnection(client);
+    this.logger.log(`Client ${client.id} terhubung`);
   }
 
   handleDisconnect(client: SocketWithUser) {
-    this.connectionHandler.handleDisconnect(client);
+    if (this.activeDrivers.delete(client.id)) {
+      this.logger.log(`Driver ${client.id} otomatis nonaktif`);
+    }
   }
 
-  @Roles(Role.driver)
-  @SubscribeMessage('subscribeNewOrders')
-  handleDriverSubscribe(@ConnectedSocket() client: SocketWithUser) {
-    return this.connectionHandler.handleDriverSubscribe(client);
+  @SubscribeMessage('toggleOrderSubscription')
+  async handleToggleSubscription(
+    @ConnectedSocket() client: SocketWithUser,
+    @MessageBody() data: ToggleOrderSubscriptionDto,
+  ) {
+    const username = client.user?.username ?? 'Unknown';
+    const active = data?.active === true;
+
+    if (!this.serverReady)
+      throw new WsException('Server belum siap menerima koneksi');
+
+    try {
+      if (active) {
+        this.activeDrivers.add(client.id);
+        await client.join('drivers');
+        this.logger.log(`Driver ${username} aktif`);
+      } else {
+        this.activeDrivers.delete(client.id);
+        await client.leave('drivers');
+        this.logger.log(`Driver ${username} nonaktif`);
+      }
+
+      await new Promise((r) => setTimeout(r, 200));
+
+      return {
+        message: active
+          ? 'Penerimaan order diaktifkan'
+          : 'Penerimaan order dimatikan',
+        data: {
+          username,
+          active,
+          totalActiveDrivers: this.activeDrivers.size,
+        },
+      };
+    } catch (err) {
+      throw new WsException((err as Error).message);
+    }
   }
 
-  broadcastNewOrderAvailable(notification: OrderAvailableNotificationDto) {
-    this.server.to('drivers').emit('newOrderNotification', notification);
+  async broadcastNewOrderAvailable(
+    notification: OrderAvailableNotificationDto,
+  ): Promise<void> {
+    if (!this.serverReady) return;
+
+    const sockets = await this.server.in('drivers').fetchSockets();
+    if (sockets.length === 0) return;
+
+    this.server.to('drivers').emit('newOrderNotification', {
+      event: 'newOrderNotification',
+      status: 'success',
+      message: 'Pesanan baru tersedia',
+      data: notification,
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    this.logger.log(`Broadcast order ke ${sockets.length} driver`);
   }
 }
