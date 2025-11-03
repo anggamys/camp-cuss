@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -22,6 +23,8 @@ interface SocketWithUser extends Socket {
 
 @Injectable()
 export class WsJwtGuard implements CanActivate {
+  private readonly logger = new Logger(WsJwtGuard.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
@@ -42,19 +45,39 @@ export class WsJwtGuard implements CanActivate {
     }
 
     try {
-      const secret = this.configService.get<string>(
-        JwtEnvKeys.JWT_ACCESS_SECRET,
-      );
+      const secret =
+        this.configService.get<string>(JwtEnvKeys.JWT_ACCESS_SECRET, '') || '';
+      if (!secret) {
+        this.logger.error('JWT_ACCESS_SECRET tidak ditemukan di konfigurasi');
+        throw new UnauthorizedException(
+          this.buildError('Konfigurasi server bermasalah', {
+            server: ['JWT secret tidak ditemukan'],
+          }),
+        );
+      }
+
       const payload = this.jwtService.verify<UserPayload>(token, { secret });
 
-      // simpan user agar bisa diakses di handler gateway
+      if (!payload?.id) {
+        throw new UnauthorizedException(
+          this.buildError('Payload token tidak valid', {
+            token: ['Data pengguna tidak ditemukan dalam token'],
+          }),
+        );
+      }
+
       client.user = payload;
       return true;
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      this.logger.warn(`Autentikasi gagal: ${errorMessage}`);
+
       if (err instanceof TokenExpiredError) {
         throw new UnauthorizedException(
           this.buildError('Token telah kedaluwarsa', {
-            token: ['Silakan login ulang untuk mendapatkan token baru'],
+            token: [
+              'Sesi Anda telah berakhir, silakan login ulang untuk melanjutkan',
+            ],
           }),
         );
       }
@@ -68,31 +91,29 @@ export class WsJwtGuard implements CanActivate {
       }
 
       if (err instanceof JsonWebTokenError) {
+        const friendlyMessage = this.getFriendlyJwtErrorMessage(err.message);
         throw new UnauthorizedException(
-          this.buildError('Token tidak valid', {
-            token: [err.message],
-          }),
+          this.buildError('Token tidak valid', { token: [friendlyMessage] }),
         );
       }
 
       throw new UnauthorizedException(
         this.buildError('Autentikasi gagal', {
-          auth: ['Gagal memverifikasi identitas pengguna'],
+          auth: ['Terjadi kesalahan saat memverifikasi identitas pengguna'],
         }),
       );
     }
   }
 
   private extractToken(client: Socket): string | null {
-    // 1. Cek dari header Authorization
     const authHeader = client.handshake.headers.authorization;
     if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-      return authHeader.split(' ')[1];
+      const token = authHeader.split(' ')[1];
+      if (token.trim()) return token;
     }
 
-    // 2. Cek dari query parameter (misal token dikirim via ?token=xxxxx)
     const queryToken = client.handshake.query.token;
-    if (typeof queryToken === 'string' && queryToken.trim() !== '') {
+    if (typeof queryToken === 'string' && queryToken.trim()) {
       return queryToken;
     }
 
@@ -110,5 +131,26 @@ export class WsJwtGuard implements CanActivate {
       errors,
       meta: null,
     };
+  }
+
+  private getFriendlyJwtErrorMessage(originalMessage: string): string {
+    const mappings: Record<string, string> = {
+      'jwt malformed': 'Format token tidak valid atau rusak',
+      'invalid token': 'Token tidak valid',
+      'invalid signature': 'Tanda tangan token tidak valid',
+      'jwt signature is required': 'Tanda tangan token diperlukan',
+      'invalid algorithm': 'Algoritma token tidak didukung',
+      'jwt audience invalid': 'Audience token tidak valid',
+      'jwt issuer invalid': 'Penerbit token tidak valid',
+      'jwt id invalid': 'ID token tidak valid',
+      'jwt subject invalid': 'Subject token tidak valid',
+    };
+
+    const lower = originalMessage.toLowerCase();
+    for (const [key, value] of Object.entries(mappings)) {
+      if (lower.includes(key)) return value;
+    }
+
+    return 'Token tidak dapat diverifikasi, silakan login ulang';
   }
 }

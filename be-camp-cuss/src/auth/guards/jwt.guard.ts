@@ -20,6 +20,7 @@ interface RequestWithHeaders {
     authorization?: string;
     [key: string]: string | string[] | undefined;
   };
+  isPublic?: boolean;
 }
 
 @Injectable()
@@ -34,8 +35,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getClass(),
     ]);
 
-    // Jika route publik, lewati guard
-    if (isPublic) return true;
+    if (isPublic) {
+      const request = context.switchToHttp().getRequest<RequestWithHeaders>();
+      request.isPublic = true; // tandai request publik
+      return true;
+    }
 
     return super.canActivate(context);
   }
@@ -49,7 +53,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const request = context.switchToHttp().getRequest<RequestWithHeaders>();
     const authHeader = request.headers.authorization;
 
-    // 1. Tidak ada Authorization header
+    // 1. Route publik — lewati semua validasi
+    if (request.isPublic) return user as TUser;
+
+    // 2. Tidak ada Authorization header
     if (!authHeader) {
       throw new UnauthorizedException(
         this.buildError('Token tidak disertakan', {
@@ -60,26 +67,24 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       );
     }
 
-    // 2. Header ada tapi kosong
-    if (typeof authHeader === 'string' && authHeader.trim() === 'Bearer') {
+    // 3. Format Bearer salah
+    if (typeof authHeader === 'string' && !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException(
-        this.buildError('Token tidak disertakan', {
-          token: ['Token tidak boleh kosong setelah kata Bearer'],
+        this.buildError('Format token salah', {
+          token: ['Gunakan format Authorization: Bearer <token>'],
         }),
       );
     }
 
-    // 3. Token tidak valid
+    // 4. Token tidak valid
     if (info instanceof JsonWebTokenError) {
-      const friendlyMessage = this.getFriendlyJwtErrorMessage(info.message);
+      const friendly = this.getFriendlyJwtErrorMessage(info.message);
       throw new UnauthorizedException(
-        this.buildError('Token tidak valid', {
-          token: [friendlyMessage],
-        }),
+        this.buildError('Token tidak valid', { token: [friendly] }),
       );
     }
 
-    // 4. Token kedaluwarsa
+    // 5. Token kedaluwarsa
     if (info instanceof TokenExpiredError) {
       throw new UnauthorizedException(
         this.buildError('Token telah kedaluwarsa', {
@@ -90,7 +95,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       );
     }
 
-    // 5. Token belum aktif
+    // 6. Token belum aktif
     if (info instanceof NotBeforeError) {
       throw new ForbiddenException(
         this.buildError('Token belum aktif', {
@@ -99,7 +104,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       );
     }
 
-    // 6. User tidak ditemukan
+    // 7. User tidak ditemukan
     if (!user) {
       throw new UnauthorizedException(
         this.buildError('User tidak ditemukan', {
@@ -110,7 +115,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       );
     }
 
-    // 7. Error lain dari Passport
+    // 8. Error umum lainnya
     if (err) {
       throw new UnauthorizedException(
         this.buildError('Autentikasi gagal', {
@@ -126,17 +131,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     message: string,
     errors: Record<string, string[] | string>,
   ): ApiResponse<null> {
-    return {
-      status: 'error',
-      message,
-      data: null,
-      errors,
-      meta: null,
-    };
+    return { status: 'error', message, data: null, errors, meta: null };
   }
 
-  private getFriendlyJwtErrorMessage(originalMessage: string): string {
-    const errorMappings: Record<string, string> = {
+  private getFriendlyJwtErrorMessage(original: string): string {
+    const map: Record<string, string> = {
       'jwt malformed': 'Format token tidak valid atau rusak',
       'invalid token': 'Token tidak valid',
       'invalid signature': 'Tanda tangan token tidak valid',
@@ -148,15 +147,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       'jwt subject invalid': 'Subject token tidak valid',
     };
 
-    // Cari pesan yang cocok (case-insensitive)
-    const lowerOriginal = originalMessage.toLowerCase();
-    for (const [key, value] of Object.entries(errorMappings)) {
-      if (lowerOriginal.includes(key)) {
-        return value;
-      }
+    const lower = original.toLowerCase();
+    for (const [key, val] of Object.entries(map)) {
+      if (lower.includes(key)) return val;
     }
-
-    // Jika tidak ada yang cocok, kembalikan pesan default
     return 'Token tidak dapat diverifikasi, silakan login ulang';
   }
 }

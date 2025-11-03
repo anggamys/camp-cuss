@@ -52,6 +52,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException(errorResponse);
     }
 
+    // kembalikan payload ke request.user
     return {
       id: user.id,
       username: user.username,
