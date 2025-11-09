@@ -9,9 +9,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { WinstonModule } from 'nest-winston';
+import { createWinstonConfig } from './common/loggers/logger.config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule, {
+    cors: true,
+    logger: WinstonModule.createLogger(createWinstonConfig()),
+  });
   const configService = app.get(ConfigService);
 
   // Prefix global agar semua endpoint diawali dengan /api/v1 misal
