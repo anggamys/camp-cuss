@@ -4,16 +4,26 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
+  Injectable,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { ValidationError } from 'class-validator';
 import { ErrorResponse, HttpErrorBody } from '../types/http-error.interface';
+import { AppLoggerService } from '../loggers/app-logger.service';
+import { RequestContextService } from '../contexts/request-context.service';
 
+@Injectable()
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  constructor(
+    private readonly logger: AppLoggerService,
+    private readonly context: RequestContextService,
+  ) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Terjadi kesalahan pada server';
@@ -32,16 +42,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const body = exceptionResponse as HttpErrorBody;
 
         // Ambil pesan utama
-        if (typeof body.message === 'string') {
-          message = body.message;
-        }
+        if (typeof body.message === 'string') message = body.message;
 
-        // Jika ada field errors di body
+        // Ambil field errors
         if (body.errors && typeof body.errors === 'object') {
           errors = Object.entries(body.errors).reduce<Record<string, string[]>>(
             (acc, [key, val]) => {
               if (!val) return acc;
-              const values: string[] = Array.isArray(val)
+              const values = Array.isArray(val)
                 ? val.map((v) => String(v))
                 : [String(val)];
               acc[key] = values;
@@ -51,7 +59,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
           );
         }
 
-        // Fallback untuk ValidationPipe default
+        // Fallback: error dari ValidationPipe
         if (
           Array.isArray(body.message) &&
           typeof body.message[0] === 'object' &&
@@ -70,23 +78,31 @@ export class HttpExceptionFilter implements ExceptionFilter {
         }
       }
 
-      // Jika pesan masih default dari Passport (bukan dari JwtAuthGuard)
       if (status === HttpStatus.UNAUTHORIZED && message === 'Unauthorized') {
         message = 'Token tidak disertakan atau tidak valid';
       }
     } else if (exception instanceof Error) {
-      // Untuk error non-HTTP (runtime)
+      // Error runtime biasa
       message = exception.message;
     }
 
-    // Logging ringan untuk development
-    if (process.env.NODE_ENV !== 'production') {
-      console.error(
-        `[HttpExceptionFilter] ${
-          exception instanceof Error ? exception.name : typeof exception
-        }: ${message}`,
-        errors ? JSON.stringify(errors, null, 2) : '',
+    const ctxData = this.context.getAll();
+    const requestId = ctxData?.requestId ?? 'unknown';
+    const userId = ctxData?.userId ?? null;
+    const path = ctxData?.path ?? request.url;
+    const method = ctxData?.method ?? request.method;
+
+    const baseLogMsg = `HTTP ${method} ${path} [${status}] - ${message}`;
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(
+        baseLogMsg,
+        (exception as Error)?.stack,
+        'HttpExceptionFilter',
       );
+    } else if (status >= HttpStatus.BAD_REQUEST) {
+      this.logger.warn(baseLogMsg, 'HttpExceptionFilter');
+    } else {
+      this.logger.log(baseLogMsg, 'HttpExceptionFilter');
     }
 
     const errorResponse: ErrorResponse = {
@@ -94,7 +110,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message,
       data: null,
       errors,
-      meta: null,
+      meta: {
+        requestId,
+        userId,
+        path,
+        method,
+      },
     };
 
     response.status(status).json(errorResponse);

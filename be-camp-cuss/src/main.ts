@@ -4,69 +4,64 @@ import {
   ValidationPipe,
   VersioningType,
   BadRequestException,
-  ValidationError,
 } from '@nestjs/common';
+import { ValidationError } from 'class-validator';
 import { ConfigService } from '@nestjs/config';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { WinstonModule } from 'nest-winston';
-import { createWinstonConfig } from './common/loggers/logger.config';
+import { AppLoggerService } from './common/loggers/app-logger.service';
+import { UserContextInterceptor } from './common/interceptors/user-context.interceptor';
+import { RequestContextService } from './common/contexts/request-context.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     cors: true,
-    logger: WinstonModule.createLogger(createWinstonConfig()),
   });
-  const configService = app.get(ConfigService);
 
-  // Prefix global agar semua endpoint diawali dengan /api/v1 misal
+  const configService = app.get(ConfigService);
+  const logger = app.get(AppLoggerService);
+
   app.setGlobalPrefix('api');
 
-  // Validasi DTO global
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true, // konversi otomatis tipe dari query/body
+      transform: true,
       exceptionFactory: (validationErrors: ValidationError[] = []) => {
-        const formattedErrors = validationErrors.reduce(
-          (acc: Record<string, string[]>, err: ValidationError) => {
-            if (err.constraints) {
-              acc[err.property] = Object.values(err.constraints);
-            }
-            return acc;
-          },
-          {},
+        const formatted = Object.fromEntries(
+          validationErrors.map((e) => [
+            e.property,
+            Object.values(e.constraints ?? {}),
+          ]),
         );
-
         throw new BadRequestException({
           message: 'Validasi gagal',
-          errors: formattedErrors,
+          errors: formatted,
         });
       },
     }),
   );
 
-  // Global Interceptor dan Filter
-  app.useGlobalInterceptors(new ResponseInterceptor());
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(
+    new ResponseInterceptor(),
+    new UserContextInterceptor(app.get(RequestContextService)),
+  );
+  app.useGlobalFilters(app.get(HttpExceptionFilter));
 
-  // Versioning berbasis URI
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',
   });
 
-  // Konfigurasi CORS (bisa disesuaikan domain FE)
   app.enableCors({
     origin: configService.get<string>('FRONTEND_URL') ?? '*',
     credentials: true,
   });
 
-  // Port dari .env
   const port = configService.get<number>('PORT') ?? 3000;
-
   await app.listen(port);
+  logger.log(`Server berjalan di port ${port}`, 'Bootstrap');
 }
 
 void bootstrap();

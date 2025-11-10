@@ -14,6 +14,7 @@ import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { UserPayload } from '../../common/types/user-context.interface';
 import { ApiResponse } from '../../common/types/api-response.interface';
+import { AuthService } from '../auth.service';
 
 interface RequestWithHeaders {
   headers: {
@@ -25,11 +26,14 @@ interface RequestWithHeaders {
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  constructor(private readonly reflector: Reflector) {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly authService: AuthService,
+  ) {
     super();
   }
 
-  canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -37,11 +41,24 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     if (isPublic) {
       const request = context.switchToHttp().getRequest<RequestWithHeaders>();
-      request.isPublic = true; // tandai request publik
+      request.isPublic = true;
       return true;
     }
 
-    return super.canActivate(context);
+    // Cek token blacklist sebelum validasi JWT
+    const request = context.switchToHttp().getRequest<RequestWithHeaders>();
+    const token = this.extractTokenFromHeader(request);
+
+    if (token && this.authService.isTokenBlacklisted(token)) {
+      throw new UnauthorizedException(
+        this.buildError('Token telah di-revoke', {
+          token: ['Sesi telah berakhir, silakan login ulang'],
+        }),
+      );
+    }
+
+    const result = await super.canActivate(context);
+    return result as boolean;
   }
 
   handleRequest<TUser = UserPayload>(
@@ -125,6 +142,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
 
     return user;
+  }
+
+  private extractTokenFromHeader(
+    request: RequestWithHeaders,
+  ): string | undefined {
+    const authHeader = request.headers.authorization;
+    if (typeof authHeader !== 'string') return undefined;
+    const [type, token] = authHeader.split(' ');
+    return type === 'Bearer' ? token : undefined;
   }
 
   private buildError(
