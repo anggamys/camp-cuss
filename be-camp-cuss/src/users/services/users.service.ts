@@ -8,6 +8,7 @@ import { PrismaErrorHelper } from '../../common/helpers/prisma-error.helper';
 import { StoragesService } from '../../storages/storages.service';
 import { StorageUrlHelper } from '../../common/helpers/storage-url.helper';
 import { UsersUploadService } from './users-upload.service';
+import { ValidationHelper } from '../../common/helpers/validation.helper';
 
 @Injectable()
 export class UsersService {
@@ -22,13 +23,20 @@ export class UsersService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly validationHelper: ValidationHelper,
     private readonly storages: StoragesService,
     private readonly usersUploadService: UsersUploadService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<CreateUserResponseDto> {
     try {
-      await this.validateUnique(dto.email, dto.username);
+      await this.validationHelper.assertUnique('user', 'email', dto.email);
+      await this.validationHelper.assertUnique(
+        'user',
+        'username',
+        dto.username,
+      );
+
       const hashed = await PasswordHelper.hash(dto.password);
       return this.prisma.user.create({
         data: { ...dto, password: hashed },
@@ -133,32 +141,6 @@ export class UsersService {
       await this.prisma.user.delete({ where: { id } });
       return { message: `Pengguna ${id} dihapus` };
     } catch (error) {
-      PrismaErrorHelper.handle(error);
-    }
-  }
-
-  private async validateUnique(email: string, username: string) {
-    try {
-      const [e, u] = await Promise.all([
-        this.prisma.user.findUnique({ where: { email } }),
-        this.prisma.user.findUnique({ where: { username } }),
-      ]);
-
-      if (e || u)
-        throw new HttpException(
-          {
-            message: 'Validasi gagal',
-            errors: {
-              ...(e && { email: 'Email sudah digunakan' }),
-              ...(u && { username: 'Username sudah digunakan' }),
-            },
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
       PrismaErrorHelper.handle(error);
     }
   }

@@ -15,6 +15,10 @@ export class CreateDestinationDto {
   @IsNumber({}, { message: 'estimated harus berupa angka' })
   @Min(0, { message: 'estimated harus bernilai minimal 0' })
   estimated: number;
+
+  @IsOptional()
+  @IsString({ message: 'image_place harus berupa string' })
+  image_place: string | null;
 }
 
 export class responseCreateDestinationDto {

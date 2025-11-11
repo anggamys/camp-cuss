@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
 import { PrismaErrorHelper } from '../../common/helpers/prisma-error.helper';
 import {
@@ -8,12 +8,14 @@ import {
 import { UpdateOrderDto } from '../dto/update-order.dto';
 import { Order, OrderStatus } from '@prisma/client';
 import { OrdersBroadcastService } from './orders-broadcast.service';
+import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 @Injectable()
 export class OrdersCoreService {
-  private readonly logger = new Logger(OrdersCoreService.name);
+  private readonly context = 'OrdersCoreService';
 
   constructor(
+    private readonly logger: AppLoggerService,
     private readonly prisma: PrismaService,
     private readonly broadcast: OrdersBroadcastService,
   ) {}
@@ -26,24 +28,43 @@ export class OrdersCoreService {
       const destination = await this.prisma.destination.findUnique({
         where: { id: dto.destination_id },
       });
-      if (!destination)
+      if (!destination) {
+        this.logger.warn(
+          `User ${customerId} mencoba membuat pesanan ke tujuan tidak valid (${dto.destination_id})`,
+          this.context,
+        );
         throw new HttpException(
           'Tempat tujuan tidak ditemukan',
           HttpStatus.BAD_REQUEST,
         );
+      }
 
       const order = await this.prisma.order.create({
         data: { ...dto, user_id: customerId },
       });
 
-      this.logger.log(`Pesanan #${order.id} dibuat oleh user ${customerId}`);
+      this.logger.log(
+        `Pesanan #${order.id} berhasil dibuat oleh user ${customerId}`,
+        this.context,
+      );
 
       if (order.status === OrderStatus.pending) {
+        this.logger.debug(
+          `Menjadwalkan broadcast untuk order #${order.id}`,
+          this.context,
+        );
+
         this.broadcast.broadcastAndSchedule(order.id, order);
       }
 
       return order as CreateOrderResponseDto;
     } catch (e) {
+      this.logger.error(
+        `Gagal membuat pesanan untuk user ${customerId}`,
+        e instanceof Error ? e.stack : String(e),
+        this.context,
+      );
+
       if (e instanceof HttpException) throw e;
       PrismaErrorHelper.handle(e);
     }
@@ -51,10 +72,20 @@ export class OrdersCoreService {
 
   async findAll(): Promise<Order[]> {
     try {
-      return await this.prisma.order.findMany({
+      const orders = await this.prisma.order.findMany({
         orderBy: { created_at: 'desc' },
       });
+      this.logger.debug(
+        `Mengambil ${orders.length} pesanan dari database`,
+        this.context,
+      );
+      return orders;
     } catch (e) {
+      this.logger.error(
+        'Gagal mengambil daftar pesanan',
+        e instanceof Error ? e.stack : String(e),
+        this.context,
+      );
       if (e instanceof HttpException) throw e;
       PrismaErrorHelper.handle(e);
     }
@@ -63,13 +94,20 @@ export class OrdersCoreService {
   async findOne(id: number): Promise<Order> {
     try {
       const order = await this.prisma.order.findUnique({ where: { id } });
-      if (!order)
+      if (!order) {
+        this.logger.warn(`Pesanan #${id} tidak ditemukan`, this.context);
         throw new HttpException(
           'Pesanan tidak ditemukan',
           HttpStatus.NOT_FOUND,
         );
+      }
       return order;
     } catch (e) {
+      this.logger.error(
+        `Gagal mengambil pesanan #${id}`,
+        e instanceof Error ? e.stack : String(e),
+        this.context,
+      );
       if (e instanceof HttpException) throw e;
       PrismaErrorHelper.handle(e);
     }
@@ -77,33 +115,34 @@ export class OrdersCoreService {
 
   async update(id: number, dto: UpdateOrderDto): Promise<Order> {
     try {
-      const existing = await this.prisma.order.findUnique({ where: { id } });
-      if (!existing)
-        throw new HttpException(
-          'Pesanan tidak ditemukan',
-          HttpStatus.NOT_FOUND,
-        );
+      const updated = await this.prisma.order.update({
+        where: { id },
+        data: dto,
+      });
 
-      return await this.prisma.order.update({ where: { id }, data: dto });
+      this.logger.log(`Pesanan #${id} diperbarui`, this.context);
+      return updated;
     } catch (e) {
-      if (e instanceof HttpException) throw e;
+      this.logger.error(
+        `Gagal memperbarui pesanan #${id}`,
+        e instanceof Error ? e.stack : String(e),
+        this.context,
+      );
       PrismaErrorHelper.handle(e);
     }
   }
 
   async remove(id: number): Promise<{ message: string }> {
     try {
-      const existing = await this.prisma.order.findUnique({ where: { id } });
-      if (!existing)
-        throw new HttpException(
-          'Pesanan tidak ditemukan',
-          HttpStatus.NOT_FOUND,
-        );
-
       await this.prisma.order.delete({ where: { id } });
+      this.logger.log(`Pesanan #${id} berhasil dihapus`, this.context);
       return { message: `Pesanan ${id} berhasil dihapus` };
     } catch (e) {
-      if (e instanceof HttpException) throw e;
+      this.logger.error(
+        `Gagal menghapus pesanan #${id}`,
+        e instanceof Error ? e.stack : String(e),
+        this.context,
+      );
       PrismaErrorHelper.handle(e);
     }
   }

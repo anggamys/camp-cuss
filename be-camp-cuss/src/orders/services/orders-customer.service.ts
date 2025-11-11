@@ -1,13 +1,15 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
 import { PrismaErrorHelper } from '../../common/helpers/prisma-error.helper';
 import { Order, OrderStatus } from '@prisma/client';
+import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 @Injectable()
 export class OrdersCustomerService {
-  private readonly logger = new Logger(OrdersCustomerService.name);
-
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: AppLoggerService,
+  ) {}
 
   async findByUserId(userId: number): Promise<Order[]> {
     try {
@@ -26,13 +28,16 @@ export class OrdersCustomerService {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
       });
+
       if (!order)
         throw new HttpException(
           'Pesanan tidak ditemukan',
           HttpStatus.NOT_FOUND,
         );
+
       if (order.user_id !== userId)
         throw new HttpException('Tidak berwenang', HttpStatus.FORBIDDEN);
+
       if (order.status === OrderStatus.completed)
         throw new HttpException(
           'Pesanan sudah selesai',
