@@ -1,5 +1,12 @@
-import { UserRole } from '@prisma/client';
-import { IsOptional, IsInt, IsString, IsEmail, Matches } from 'class-validator';
+import { DriverStatus, UserRole } from '@prisma/client';
+import {
+  IsOptional,
+  IsInt,
+  IsString,
+  IsEmail,
+  Matches,
+  IsEnum,
+} from 'class-validator';
 
 export class FindUserResponseDto {
   @IsOptional()
@@ -23,8 +30,12 @@ export class FindUserResponseDto {
   no_phone?: string;
 
   @IsOptional()
-  @IsString({ message: 'Role harus berupa teks' })
+  @IsEnum(UserRole, { message: 'Role user tidak valid' })
   role?: UserRole;
+
+  @IsOptional()
+  @IsEnum(DriverStatus, { message: 'Status driver tidak valid' })
+  driverStatus?: DriverStatus;
 
   @IsOptional()
   @IsString({ message: 'Foto profil harus berupa teks' })

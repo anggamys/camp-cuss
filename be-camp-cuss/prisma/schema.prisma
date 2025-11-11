@@ -44,9 +44,9 @@ model DriverRequest {
   user_id      Int
   user         User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
   status       ApprovalStatus  @default(pending)
-  user_notes   String?         // alasan user ingin menjadi driver
-  admin_notes  String?         // catatan admin saat approve/reject
-  approved_by  Int?            // id admin yang memproses
+  user_notes   String?         
+  admin_notes  String?        
+  approved_by  Int?            
   admin        User?           @relation("AdminApprover", fields: [approved_by], references: [id])
   created_at   DateTime        @default(now())
   updated_at   DateTime        @updatedAt

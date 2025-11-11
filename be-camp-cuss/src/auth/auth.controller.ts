@@ -1,10 +1,11 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { User } from '../common/decorators/user.decorator';
 import { JwtAuthGuard } from './guards/jwt.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { loginDto, refreshTokenDto } from './dto/login.dto';
+import { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -45,8 +46,11 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
-  async logout(@User('id') userId: number) {
-    await this.authService.logout(userId);
+  async logout(@User('id') userId: number, @Req() request: Request) {
+    const authHeader = request.headers.authorization;
+    const token = authHeader?.replace('Bearer ', '');
+
+    await this.authService.logout(userId, token);
 
     return {
       message: 'Logout berhasil',

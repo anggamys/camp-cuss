@@ -1,76 +1,120 @@
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { HttpException, HttpStatus } from '@nestjs/common';
+import { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
 import { User } from '@prisma/client';
 import { JwtEnvKeys } from '../enums/env-keys.enum';
 
 interface JwtPayload {
   sub: number;
-  id: number;
   username: string;
   role: string;
 }
 
 export class TokenHelper {
-  // Bangun payload JWT
+  /** Build JWT payload */
   private static buildPayload(user: User): JwtPayload {
     return {
       sub: user.id,
-      id: user.id,
       username: user.username,
       role: user.role,
     };
   }
 
-  // Pastikan environment numeric (detik)
-  private static getRequiredNumber(config: ConfigService, key: string): number {
+  /** Read numeric env var (in seconds) */
+  private static getNumber(config: ConfigService, key: string): number {
     const raw = config.get<string>(key);
-    if (!raw) throw new Error(`Missing environment variable: ${key}`);
-
+    if (!raw) throw new Error(`Missing env: ${key}`);
     const value = Number(raw);
-    if (Number.isNaN(value) || value <= 0) {
-      throw new Error(
-        `Invalid numeric value for ${key}: must be a positive number (in seconds)`,
-      );
-    }
+    if (isNaN(value) || value <= 0)
+      throw new Error(`Invalid number in ${key}: ${raw}`);
     return value;
   }
 
-  // Pastikan environment string (secret)
-  private static getRequiredString(config: ConfigService, key: string): string {
+  /** Read string env var */
+  private static getString(config: ConfigService, key: string): string {
     const value = config.get<string>(key);
-    if (!value) throw new Error(`Missing environment variable: ${key}`);
+    if (!value) throw new Error(`Missing env: ${key}`);
     return value;
   }
 
-  // Generate Access Token
+  /** Generate Access Token */
   static async generateAccessToken(
     jwt: JwtService,
     config: ConfigService,
     user: User,
   ): Promise<string> {
     const payload = this.buildPayload(user);
-
     const options: JwtSignOptions = {
-      secret: this.getRequiredString(config, JwtEnvKeys.JWT_ACCESS_SECRET),
-      expiresIn: this.getRequiredNumber(config, JwtEnvKeys.JWT_ACCESS_EXPIRES),
+      secret: this.getString(config, JwtEnvKeys.JWT_ACCESS_SECRET),
+      expiresIn: this.getNumber(config, JwtEnvKeys.JWT_ACCESS_EXPIRES),
     };
-
     return jwt.signAsync(payload, options);
   }
 
-  // Generate Refresh Token
+  /** Generate Refresh Token */
   static async generateRefreshToken(
     jwt: JwtService,
     config: ConfigService,
     user: User,
   ): Promise<string> {
     const payload = this.buildPayload(user);
-
     const options: JwtSignOptions = {
-      secret: this.getRequiredString(config, JwtEnvKeys.JWT_REFRESH_SECRET),
-      expiresIn: this.getRequiredNumber(config, JwtEnvKeys.JWT_REFRESH_EXPIRES),
+      secret: this.getString(config, JwtEnvKeys.JWT_REFRESH_SECRET),
+      expiresIn: this.getNumber(config, JwtEnvKeys.JWT_REFRESH_EXPIRES),
     };
-
     return jwt.signAsync(payload, options);
+  }
+
+  /** Verify token type */
+  static verifyToken<T extends object>(
+    jwt: JwtService,
+    config: ConfigService,
+    token: string,
+    type: 'access' | 'refresh',
+  ): T {
+    const secret =
+      type === 'access'
+        ? this.getString(config, JwtEnvKeys.JWT_ACCESS_SECRET)
+        : this.getString(config, JwtEnvKeys.JWT_REFRESH_SECRET);
+    try {
+      return jwt.verify<T>(token, { secret });
+    } catch (err) {
+      if (err instanceof TokenExpiredError)
+        throw new HttpException(
+          `${type} token telah kedaluwarsa`,
+          HttpStatus.UNAUTHORIZED,
+        );
+      if (err instanceof JsonWebTokenError)
+        throw new HttpException(
+          `${type} token tidak valid`,
+          HttpStatus.UNAUTHORIZED,
+        );
+      throw new HttpException(
+        `Kesalahan verifikasi ${type} token`,
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+  }
+
+  /** Decode tanpa throw */
+  static decode(
+    jwt: JwtService,
+    token: string,
+  ): Record<string, unknown> | null {
+    try {
+      const decoded: unknown = jwt.decode(token);
+      return decoded && typeof decoded === 'object' && !Array.isArray(decoded)
+        ? (decoded as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Ambil waktu kedaluwarsa (UNIX seconds) */
+  static getExpiry(jwt: JwtService, token: string): number | null {
+    const decoded = this.decode(jwt, token);
+    return decoded && typeof decoded.exp === 'number' ? decoded.exp : null;
   }
 }

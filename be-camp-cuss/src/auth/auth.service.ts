@@ -1,3 +1,4 @@
+// src/auth/auth.service.ts
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -9,203 +10,115 @@ import {
   responseLoginDto,
   responseRefreshTokenDto,
 } from './dto/login.dto';
-import { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
 import { RegisterDto, RegisterUserResponseDto } from './dto/register.dto';
 import { PasswordHelper } from '../common/helpers/password.helper';
 import { TokenHelper } from '../common/helpers/token.helper';
+import { ValidationHelper } from '../common/helpers/validation.helper';
+import { AppLoggerService } from '../common/loggers/app-logger.service';
+import { TokenStoreHelper } from '../common/helpers/token-store.helper';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
-    private jwt: JwtService,
-    private config: ConfigService,
+    private readonly jwt: JwtService,
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly logger: AppLoggerService,
+    private readonly validation: ValidationHelper,
+    private readonly tokenStore: TokenStoreHelper,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<RegisterUserResponseDto> {
-    try {
-      await this.validateUniqueFields(registerDto.email, registerDto.username);
+  async register(dto: RegisterDto): Promise<RegisterUserResponseDto> {
+    this.logger.log(`Register user: ${dto.email}`);
+    await this.validation.assertUnique('user', 'email', dto.email);
+    await this.validation.assertUnique('user', 'username', dto.username);
 
-      const hashedPassword = await PasswordHelper.hash(registerDto.password);
-
-      const user = await this.prisma.user.create({
-        data: { ...registerDto, password: hashedPassword },
-        select: { id: true, email: true, username: true },
-      });
-
-      return user;
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      throw new HttpException(
-        'Gagal mendaftarkan pengguna',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    const hashed = await PasswordHelper.hash(dto.password);
+    const user = await this.prisma.user.create({
+      data: { ...dto, password: hashed },
+      select: { id: true, email: true, username: true },
+    });
+    this.logger.log(`User registered id=${user.id}`);
+    return user;
   }
 
-  async login(loginDto: loginDto): Promise<responseLoginDto> {
-    try {
-      const { username, password } = loginDto;
+  async login(dto: loginDto): Promise<responseLoginDto> {
+    const { username, password } = dto;
+    this.logger.log(`Login attempt: ${username}`);
 
-      const user = await this.prisma.user.findUnique({ where: { username } });
-      if (!user)
-        throw new HttpException(
-          'Pengguna tidak ditemukan',
-          HttpStatus.NOT_FOUND,
-        );
+    const user = await this.prisma.user.findUnique({ where: { username } });
+    if (!user)
+      throw new HttpException('Pengguna tidak ditemukan', HttpStatus.NOT_FOUND);
 
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid)
-        throw new HttpException(
-          'Kredensial tidak valid',
-          HttpStatus.UNAUTHORIZED,
-        );
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid)
+      throw new HttpException('Password salah', HttpStatus.UNAUTHORIZED);
 
-      const accessToken = await TokenHelper.generateAccessToken(
-        this.jwt,
-        this.config,
-        user,
-      );
+    const access = await TokenHelper.generateAccessToken(
+      this.jwt,
+      this.config,
+      user,
+    );
+    const refresh = await TokenHelper.generateRefreshToken(
+      this.jwt,
+      this.config,
+      user,
+    );
 
-      const refreshToken = await TokenHelper.generateRefreshToken(
-        this.jwt,
-        this.config,
-        user,
-      );
+    const hashedRefresh = await PasswordHelper.hash(refresh);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refresh_token: hashedRefresh },
+    });
 
-      const hashedRefresh = await PasswordHelper.hash(refreshToken);
-
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { refresh_token: hashedRefresh },
-      });
-
-      return { access_token: accessToken, refresh_token: refreshToken };
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      throw new HttpException(
-        'Gagal melakukan login',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    this.logger.log(`Login success: userId=${user.id}`);
+    return { access_token: access, refresh_token: refresh };
   }
 
-  async refreshToken(
-    refreshTokenDto: refreshTokenDto,
-  ): Promise<responseRefreshTokenDto> {
-    const { refresh_token } = refreshTokenDto;
+  async refreshToken(dto: refreshTokenDto): Promise<responseRefreshTokenDto> {
+    const { refresh_token } = dto;
 
-    try {
-      const decoded = this.jwt.verify<{
-        sub: number | string;
-        username: string;
-      }>(refresh_token, { secret: this.config.get('JWT_REFRESH_SECRET') });
+    const decoded = TokenHelper.verifyToken<{ sub: number }>(
+      this.jwt,
+      this.config,
+      refresh_token,
+      'refresh',
+    );
 
-      const userId =
-        typeof decoded.sub === 'string' ? Number(decoded.sub) : decoded.sub;
+    const userId = Number(decoded.sub);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.refresh_token)
+      throw new HttpException('Token tidak valid', HttpStatus.UNAUTHORIZED);
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
+    const match = await PasswordHelper.compare(
+      refresh_token,
+      user.refresh_token,
+    );
+    if (!match)
+      throw new HttpException('Token tidak valid', HttpStatus.UNAUTHORIZED);
 
-      if (!user || !user.refresh_token)
-        throw new HttpException(
-          'Refresh token tidak ditemukan',
-          HttpStatus.UNAUTHORIZED,
-        );
+    const newAccess = await TokenHelper.generateAccessToken(
+      this.jwt,
+      this.config,
+      user,
+    );
 
-      const isValid = await PasswordHelper.compare(
-        refresh_token,
-        user.refresh_token,
-      );
-
-      if (!isValid)
-        throw new HttpException(
-          'Refresh token tidak valid',
-          HttpStatus.UNAUTHORIZED,
-        );
-
-      const newRefreshToken = await TokenHelper.generateRefreshToken(
-        this.jwt,
-        this.config,
-        user,
-      );
-
-      const hashedRefresh = await PasswordHelper.hash(newRefreshToken);
-
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { refresh_token: hashedRefresh },
-      });
-
-      const newAccessToken = await TokenHelper.generateAccessToken(
-        this.jwt,
-        this.config,
-        user,
-      );
-
-      return { access_token: newAccessToken };
-    } catch (err) {
-      if (err instanceof TokenExpiredError)
-        throw new HttpException(
-          'Refresh token telah kedaluwarsa',
-          HttpStatus.UNAUTHORIZED,
-        );
-
-      if (err instanceof JsonWebTokenError)
-        throw new HttpException(
-          'Refresh token tidak valid',
-          HttpStatus.UNAUTHORIZED,
-        );
-
-      throw new HttpException('Kesalahan otentikasi', HttpStatus.UNAUTHORIZED);
-    }
+    this.logger.log(`Token refreshed for userId=${user.id}`);
+    return { access_token: newAccess };
   }
 
-  async logout(userId: number): Promise<void> {
-    try {
-      console.log('Logging out user with ID:', userId);
+  async logout(userId: number, accessToken?: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { refresh_token: null },
+    });
 
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { refresh_token: null },
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-
-      throw new HttpException(
-        { message: 'Gagal logout', errors: { logout: errorMessage } },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    if (accessToken) this.tokenStore.add(accessToken);
+    this.logger.log(`User logout success: id=${userId}`);
   }
 
-  private async validateUniqueFields(email: string, username: string) {
-    try {
-      const [emailExists, usernameExists] = await Promise.all([
-        this.prisma.user.findUnique({ where: { email } }),
-        this.prisma.user.findUnique({ where: { username } }),
-      ]);
-
-      if (emailExists || usernameExists) {
-        throw new HttpException(
-          {
-            message: 'Validasi gagal',
-            errors: {
-              email: emailExists ? 'Email sudah digunakan' : undefined,
-              username: usernameExists ? 'Username sudah digunakan' : undefined,
-            },
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      throw new HttpException(
-        'Gagal memvalidasi data pengguna',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+  /** Mengecek token di blacklist */
+  isTokenBlacklisted(token: string): boolean {
+    return this.tokenStore.has(token);
   }
 }
