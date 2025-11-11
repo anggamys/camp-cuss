@@ -46,58 +46,44 @@ async function bootstrap() {
   >[] = [
     {
       name: 'Fakultas Ilmu Komputer',
-      latitude: -7.334667,
-      longitude: 112.788194,
       estimated: 15,
       imageFile: 'fasilkom.png',
     },
     {
       name: 'Gedung Rektorat',
-      latitude: -7.334667,
-      longitude: 112.788194,
       estimated: 15,
       imageFile: 'Rektorat_UPN_Jatim.jpg',
     },
     {
       name: 'Fakultas Kedokteran',
-      latitude: -7.334667,
-      longitude: 112.788194,
       estimated: 15,
       imageFile: 'fk.jpg',
     },
     {
       name: 'Giri Pustaka',
-      latitude: -7.334667,
-      longitude: 112.788194,
       estimated: 15,
       imageFile: 'giri-pustaka.jpg',
     },
     {
       name: 'Fakultas Ekonomi dan Bisnis',
-      latitude: -7.334667,
-      longitude: 112.788194,
       estimated: 15,
       imageFile: 'feb.jpeg',
     },
     {
       name: 'Gedung Kuliah Bersama',
-      latitude: -7.334667,
-      longitude: 112.788194,
       estimated: 15,
       imageFile: 'gkb.jpg',
     },
     {
       name: 'Tekno Park',
-      latitude: -7.334667,
-      longitude: 112.788194,
       estimated: 15,
       imageFile: 'tekno-park.jpg',
     },
   ];
 
   try {
-    await destinationsService['prisma'].destinations.deleteMany();
-    await usersService['prisma'].users.deleteMany();
+    await destinationsService['prisma'].destination.deleteMany();
+    await usersService['prisma'].user.deleteMany();
     console.log('Semua data berhasil dihapus.');
 
     for (const user of seedUsers) {
@@ -128,8 +114,6 @@ async function bootstrap() {
 
       await destinationsService.create({
         name: destination.name!,
-        latitude: destination.latitude!,
-        longitude: destination.longitude!,
         estimated: destination.estimated!,
         image_place: imageKey ?? null,
       });
