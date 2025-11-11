@@ -14,16 +14,19 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { LoggerModule } from './common/loggers/logger.module';
 import { RequestContextMiddleware } from './common/contexts/request-context.middleware';
 import { AuthService } from './auth/auth.service';
+import { AppLoggerService } from './common/loggers/app-logger.service';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    LoggerModule,
+    AuthModule,
     UsersModule,
-    AuthModule, // Pastikan AuthModule di-import agar AuthService tersedia
-    DestinationsModule,
-    StoragesModule,
     OrdersModule,
+    CommonModule,
+    LoggerModule,
+    StoragesModule,
+    DestinationsModule,
     OrdersNotificationsModule,
   ],
   controllers: [],
@@ -32,9 +35,12 @@ import { AuthService } from './auth/auth.service';
     JwtStrategy,
     {
       provide: APP_GUARD,
-      useFactory: (reflector: Reflector, authService: AuthService) =>
-        new JwtAuthGuard(reflector, authService),
-      inject: [Reflector, AuthService], // Tambahkan AuthService di inject
+      useFactory: (
+        reflector: Reflector,
+        authService: AuthService,
+        logger: AppLoggerService,
+      ) => new JwtAuthGuard(reflector, authService, logger),
+      inject: [Reflector, AuthService, AppLoggerService],
     },
     {
       provide: APP_GUARD,
