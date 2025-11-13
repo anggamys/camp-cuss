@@ -23,7 +23,6 @@ export class AppLoggerService implements LoggerService {
           const level = info.level;
           const message = info.message as string;
           const stack = info.stack as string | undefined;
-          // Format yang lebih konsisten
           return `${timestamp} [${level.toUpperCase().padEnd(5)}] ${message}${stack ? '\n' + stack : ''}`;
         }),
       ),

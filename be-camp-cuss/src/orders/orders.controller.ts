@@ -29,7 +29,6 @@ export class OrdersController {
   ) {}
 
   // Customer actions
-
   @Post()
   @Roles(Role.customer)
   async create(@User('id') customerId: number, @Body() dto: CreateOrderDto) {
@@ -103,7 +102,6 @@ export class OrdersController {
   }
 
   // Driver actions
-
   @Post(':id/accept')
   @Roles(Role.driver)
   async acceptOrder(
