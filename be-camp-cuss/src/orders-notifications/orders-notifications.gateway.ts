@@ -8,22 +8,26 @@ import {
   WsException,
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
-import { Logger, UseFilters, UseGuards, UseInterceptors } from '@nestjs/common';
+import { UseGuards, UseInterceptors } from '@nestjs/common';
 import { SocketWithUser } from './types/socket-user.interface';
 import { OrderAvailableNotificationDto } from './dto/orders-notification.dto';
 import { ToggleOrderSubscriptionDto } from './dto/toggle-order-subs.dto';
 import { WsJwtGuard } from '../auth/guards/ws-jwt.guard';
-import { WsGlobalExceptionFilter } from '../common/filters/ws-exception.filter';
+// import { WsGlobalExceptionFilter } from '../common/filters/ws-exception.filter';
 import { WsTransformInterceptor } from '../common/interceptors/ws-transform.interceptor';
+import { AppLoggerService } from '../common/loggers/app-logger.service';
 
 @UseGuards(WsJwtGuard)
-@UseFilters(WsGlobalExceptionFilter)
+// @UseFilters(WsGlobalExceptionFilter)
 @UseInterceptors(WsTransformInterceptor)
 @WebSocketGateway({ cors: true, namespace: '/orders' })
 export class OrdersNotificationsGateway implements OnGatewayInit {
-  private readonly logger = new Logger(OrdersNotificationsGateway.name);
   private serverReady = false;
+
+  private readonly context = 'OrdersNotificationsGateway';
   private readonly activeDrivers = new Set<string>();
+
+  constructor(private readonly logger: AppLoggerService) {}
 
   @WebSocketServer()
   server!: Server;
@@ -31,16 +35,16 @@ export class OrdersNotificationsGateway implements OnGatewayInit {
   afterInit(server: Server) {
     this.server = server;
     this.serverReady = true;
-    this.logger.log('Gateway siap menerima koneksi & broadcast');
+    this.logger.log('Gateway siap menerima koneksi & broadcast', this.context);
   }
 
   handleConnection(client: SocketWithUser) {
-    this.logger.log(`Client ${client.id} terhubung`);
+    this.logger.log(`Client ${client.id} terhubung`, this.context);
   }
 
   handleDisconnect(client: SocketWithUser) {
     if (this.activeDrivers.delete(client.id)) {
-      this.logger.log(`Driver ${client.id} otomatis nonaktif`);
+      this.logger.log(`Driver ${client.id} otomatis nonaktif`, this.context);
     }
   }
 
@@ -59,11 +63,11 @@ export class OrdersNotificationsGateway implements OnGatewayInit {
       if (active) {
         this.activeDrivers.add(client.id);
         await client.join('drivers');
-        this.logger.log(`Driver ${username} aktif`);
+        this.logger.log(`Driver ${username} aktif`, this.context);
       } else {
         this.activeDrivers.delete(client.id);
         await client.leave('drivers');
-        this.logger.log(`Driver ${username} nonaktif`);
+        this.logger.log(`Driver ${username} nonaktif`, this.context);
       }
 
       await new Promise((r) => setTimeout(r, 200));
@@ -101,6 +105,9 @@ export class OrdersNotificationsGateway implements OnGatewayInit {
       },
     });
 
-    this.logger.log(`Broadcast order ke ${sockets.length} driver`);
+    this.logger.log(
+      `Broadcast order ke ${sockets.length} driver`,
+      this.context,
+    );
   }
 }

@@ -6,9 +6,8 @@ import { RequestContextData } from '../types/request-context.interface';
 export class RequestContextService {
   private static readonly storage = new AsyncLocalStorage<RequestContextData>();
 
-  // Method instance yang benar
   run(context: RequestContextData, callback: () => void) {
-    RequestContextService.storage.run(context, callback); // Panggil storage langsung
+    RequestContextService.storage.run(context, callback);
   }
 
   get<T extends keyof RequestContextData>(
@@ -22,7 +21,6 @@ export class RequestContextService {
     return RequestContextService.storage.getStore();
   }
 
-  // Method static (opsional, jika diperlukan)
   static run(context: RequestContextData, callback: () => void) {
     RequestContextService.storage.run(context, callback);
   }

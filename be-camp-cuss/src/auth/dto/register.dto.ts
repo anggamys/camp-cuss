@@ -1,5 +1,11 @@
 import { UserRole } from '@prisma/client';
-import { IsEmail, IsString, IsNotEmpty, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  IsNotEmpty,
+  IsEnum,
+  IsOptional,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsString({ message: 'Username harus berupa string' })
@@ -19,6 +25,7 @@ export class RegisterDto {
   npm: string;
 
   @IsEnum(UserRole, { message: 'Role tidak valid' })
+  @IsOptional()
   role?: UserRole;
 
   @IsString({ message: 'Nomor telepon harus berupa string' })

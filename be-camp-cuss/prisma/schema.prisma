@@ -15,41 +15,42 @@ datasource db {
 }
 
 model User {
-  id                    Int              @id @default(autoincrement())
-  username              String           @unique
-  email                 String           @unique
-  npm                   String
-  no_phone              String
-  password              String
-  role                  UserRole         @default(customer)
-  driver_status         DriverStatus?    @default(pending)
-  photo_profile         String?
-  photo_id_card         String?
-  photo_student_card    String?
-  photo_driving_license String?
-  refresh_token         String?
-  created_at            DateTime         @default(now())
-  updated_at            DateTime         @updatedAt
+  id                        Int               @id @default(autoincrement())
+  username                  String            @unique
+  npm                       String
+  password                  String
+  email                     String            @unique
+  driver_status             DriverStatus?     @default(pending)
+  no_phone                  String
+  photo_profile             String?
+  role                      UserRole          @default(customer)
+  photo_id_card             String?
+  photo_student_card        String?
+  photo_driving_license     String?
+  refresh_token             String?
+  created_at                DateTime          @default(now())
+  updated_at                DateTime          @updatedAt
 
-  driverRequests        DriverRequest[]
-  ordersAsCustomer      Order[]          @relation("UserOrders")
-  ordersAsDriver        Order[]          @relation("DriverOrders")
-  approvedDriverRequests DriverRequest[] @relation("AdminApprover")
+  driverLocation            DriverLocation?
+  driverRequests            DriverRequest[]
+  ordersAsCustomer          Order[]           @relation("UserOrders")
+  ordersAsDriver            Order[]           @relation("DriverOrders")
+  approvedDriverRequests    DriverRequest[]   @relation("AdminApprover")
 
   @@map("users")
 }
 
 model DriverRequest {
-  id           Int             @id @default(autoincrement())
-  user_id      Int
-  user         User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  status       ApprovalStatus  @default(pending)
-  user_notes   String?         
-  admin_notes  String?        
-  approved_by  Int?            
-  admin        User?           @relation("AdminApprover", fields: [approved_by], references: [id])
-  created_at   DateTime        @default(now())
-  updated_at   DateTime        @updatedAt
+  id            Int               @id @default(autoincrement())
+  user_id       Int
+  user          User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  status        ApprovalStatus    @default(pending)
+  user_notes    String?         
+  admin_notes   String?        
+  approved_by   Int?            
+  admin         User?             @relation("AdminApprover", fields: [approved_by], references: [id])
+  created_at    DateTime          @default(now())
+  updated_at    DateTime          @updatedAt
 
   @@map("driver_requests")
   @@index([status])
@@ -57,35 +58,47 @@ model DriverRequest {
 }
 
 model Destination {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  image_place String?
-  estimated   Int
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
+  id            Int         @id @default(autoincrement())
+  name          String      @unique
+  image_place   String?
+  estimated     Int
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
 
-  orders      Order[]
+  orders        Order[]
 
   @@map("destinations")
 }
 
 model Order {
-  id                Int          @id @default(autoincrement())
-  user_id           Int
-  driver_id         Int?
-  destination_id    Int
-  pick_up_location  String
-  pick_up_latitude  Float
-  pick_up_longitude Float
-  status            OrderStatus  @default(pending)
-  created_at        DateTime     @default(now())
-  updated_at        DateTime     @updatedAt
+  id                  Int           @id @default(autoincrement())
+  user_id             Int
+  driver_id           Int?
+  destination_id      Int
+  pick_up_location    String
+  pick_up_latitude    Float
+  pick_up_longitude   Float
+  status              OrderStatus   @default(pending)
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
 
-  user              User         @relation("UserOrders", fields: [user_id], references: [id])
-  driver            User?        @relation("DriverOrders", fields: [driver_id], references: [id])
-  destination       Destination  @relation(fields: [destination_id], references: [id])
+  user                User          @relation("UserOrders", fields: [user_id], references: [id])
+  driver              User?         @relation("DriverOrders", fields: [driver_id], references: [id])
+  destination         Destination   @relation(fields: [destination_id], references: [id])
 
   @@map("orders")
+}
+
+model DriverLocation {
+  id            Int         @id @default(autoincrement())
+  driver_id     Int         @unique
+  latitude      Float
+  longitude     Float
+  updated_at    DateTime    @updatedAt
+
+  driver        User        @relation(fields: [driver_id], references: [id], onDelete: Cascade)
+
+  @@map("driver_locations")
 }
 
 enum UserRole {

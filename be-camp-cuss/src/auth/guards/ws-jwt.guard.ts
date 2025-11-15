@@ -89,7 +89,6 @@ export class WsJwtGuard implements CanActivate {
     }
   }
 
-  /** Type guard untuk memvalidasi JWT payload */
   private isValidJwtPayload(decoded: unknown): decoded is JwtPayload {
     if (
       decoded === null ||
@@ -109,7 +108,6 @@ export class WsJwtGuard implements CanActivate {
     );
   }
 
-  /** Ekstraksi token dari header atau query params */
   private extractToken(client: Socket): string | null {
     const authHeader = client.handshake.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
@@ -125,7 +123,6 @@ export class WsJwtGuard implements CanActivate {
     return null;
   }
 
-  /** Tangani semua jenis error JWT dengan pesan ramah */
   private handleJwtError(err: unknown): never {
     const message = err instanceof Error ? err.message : 'Unknown error';
     this.logger.warn(`Autentikasi WS gagal: ${message}`, this.context);
@@ -162,7 +159,6 @@ export class WsJwtGuard implements CanActivate {
     );
   }
 
-  /** Format response error standar */
   private buildError(
     message: string,
     errors: Record<string, string[] | string>,
@@ -170,7 +166,6 @@ export class WsJwtGuard implements CanActivate {
     return { status: 'error', message, data: null, errors, meta: null };
   }
 
-  /** Mapping pesan error JWT menjadi lebih ramah */
   private getFriendlyJwtErrorMessage(raw: string): string {
     const map: Record<string, string> = {
       'jwt malformed': 'Format token tidak valid atau rusak',
