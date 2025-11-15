@@ -17,7 +17,6 @@ import { UpdateDriverLocationDto } from './dto/update-driver-location.dto';
 import { TopicDriverLocationSocketIo } from '../common/enums/topic-socket-io.enum';
 import { SocketWithUser } from '../orders-notifications/types/socket-user.interface';
 import { BaseGateway } from '../common/gateways/base.gateway';
-import { EventPattern, Payload } from '@nestjs/microservices';
 
 interface DriverLocationEventData {
   driver_id: number;
@@ -75,13 +74,7 @@ export class DriverLocationsGateway extends BaseGateway {
     });
   }
 
-  /** Broadcast lokasi driver ke semua client */
-  @EventPattern('driver:location')
-  handleRedisLocationEvent(@Payload() data: DriverLocationEventData) {
-    this.logger.debug(
-      `Broadcast lokasi driver ${data.driver_id} ke semua client`,
-      this.context,
-    );
+  broadcastLocation(data: DriverLocationEventData) {
     this.server.emit(TopicDriverLocationSocketIo.DRIVER_LOCATION_UPDATE, data);
   }
 }

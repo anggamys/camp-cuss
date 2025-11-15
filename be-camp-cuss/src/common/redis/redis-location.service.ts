@@ -1,59 +1,40 @@
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
+import { Injectable, Inject } from '@nestjs/common';
+import { RedisBaseService } from './redis-base.service';
 import { AppLoggerService } from '../loggers/app-logger.service';
+import { REDIS_CLIENT } from './redis.provider';
+import { Redis } from 'ioredis';
 
 export interface DriverLocationData {
   driver_id: number;
   latitude: number;
   longitude: number;
-  timestamp: number;
   heading?: number;
   speed?: number;
+  timestamp?: number;
 }
 
 @Injectable()
-export class RedisLocationService implements OnModuleDestroy {
-  private readonly CHANNEL = 'driver:location';
-  private readonly context = 'RedisLocationService';
+export class RedisLocationService extends RedisBaseService {
+  private readonly channel = 'driver:location';
+  private readonly cacheKeyPrefix = 'driver:location:';
+  private readonly cacheTTL = 60; // detik
 
-  constructor(
-    @Inject('REDIS_SERVICE') private readonly redisClient: ClientProxy,
-    private readonly logger: AppLoggerService,
-  ) {}
-
-  publishLocationUpdate(data: DriverLocationData) {
-    if (!this.isValidDriverLocationData(data)) {
-      this.logger.warn('Data lokasi driver tidak valid', this.context);
-      return;
-    }
-
-    this.logger.debug(
-      `Publishing lokasi driver ${data.driver_id} ke Redis`,
-      this.context,
-    );
-
-    this.redisClient.emit(this.CHANNEL, {
-      ...data,
-      timestamp: data.timestamp ?? Date.now(),
-    });
+  constructor(@Inject(REDIS_CLIENT) redis: Redis, logger: AppLoggerService) {
+    super(redis, logger);
   }
 
-  private isValidDriverLocationData(data: unknown): data is DriverLocationData {
-    if (typeof data !== 'object' || data === null) return false;
-    const d = data as Record<string, unknown>;
-    return (
-      typeof d.driver_id === 'number' &&
-      typeof d.latitude === 'number' &&
-      typeof d.longitude === 'number' &&
-      d.latitude >= -90 &&
-      d.latitude <= 90 &&
-      d.longitude >= -180 &&
-      d.longitude <= 180
+  async publishLocationUpdate(data: DriverLocationData): Promise<void> {
+    const payload = { ...data, timestamp: data.timestamp ?? Date.now() };
+    await this.publish(this.channel, payload);
+    await this.set(
+      `${this.cacheKeyPrefix}${data.driver_id}`,
+      payload,
+      this.cacheTTL,
     );
   }
 
-  async onModuleDestroy() {
-    await this.redisClient.close();
-    this.logger.log('Redis client closed', this.context);
+  async getLastLocation(driverId: number): Promise<DriverLocationData | null> {
+    const cache = await this.get(`${this.cacheKeyPrefix}${driverId}`);
+    return cache ? (JSON.parse(cache) as DriverLocationData) : null;
   }
 }
