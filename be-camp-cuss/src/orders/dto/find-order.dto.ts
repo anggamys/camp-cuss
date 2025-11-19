@@ -1,8 +1,6 @@
 import { OrderStatus } from '@prisma/client';
 import { IsEnum, IsNumber, IsString } from 'class-validator';
 
-export class FindOrderDto {}
-
 export class FindOrderResponseDto {
   @IsNumber({}, { message: 'ID harus berupa angka' })
   id: number;

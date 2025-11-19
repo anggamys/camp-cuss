@@ -7,17 +7,7 @@ import {
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Socket } from 'socket.io';
-
-export interface WsTransformResult<T = unknown> {
-  event: string;
-  status: 'success' | 'error';
-  message: string;
-  data: T | null;
-  meta: {
-    timestamp: string;
-    clientId: string;
-  };
-}
+import { WsTransformResult } from '../types/ws-response.interface';
 
 @Injectable()
 export class WsTransformInterceptor implements NestInterceptor {
@@ -44,14 +34,11 @@ export class WsTransformInterceptor implements NestInterceptor {
           }
 
           if ('data' in resp) {
-            // explicit data property present
             dataVal = resp['data'] as T;
           } else {
-            // no data property — use the whole response object as data where appropriate
             dataVal = response as T;
           }
         } else {
-          // primitive value or null/undefined
           if (response !== undefined && response !== null) {
             dataVal = response as T;
           } else {
@@ -60,11 +47,14 @@ export class WsTransformInterceptor implements NestInterceptor {
         }
 
         return {
-          event: eventName,
           status: 'success',
           message,
           data: dataVal,
-          meta: { timestamp: now, clientId },
+          meta: {
+            event: eventName,
+            clientId,
+            timestamp: now,
+          },
         };
       }),
     );

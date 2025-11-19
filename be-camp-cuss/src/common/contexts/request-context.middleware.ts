@@ -8,11 +8,9 @@ export class RequestContextMiddleware implements NestMiddleware {
   constructor(private readonly context: RequestContextService) {}
 
   use(req: Request, res: Response, next: NextFunction) {
-    // Hanya set requestId di middleware
-    // User ID akan di-set nanti oleh guard/interceptor
     const contextData = {
       requestId: randomUUID(),
-      userId: undefined, // Akan di-update nanti
+      userId: undefined,
       path: req.path,
       method: req.method,
     };

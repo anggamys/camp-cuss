@@ -16,6 +16,8 @@ import { RequestContextMiddleware } from './common/contexts/request-context.midd
 import { AuthService } from './auth/auth.service';
 import { AppLoggerService } from './common/loggers/app-logger.service';
 import { CommonModule } from './common/common.module';
+import { DriverLocationsModule } from './driver-locations/driver-locations.module';
+import { RedisModule } from './common/redis';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { CommonModule } from './common/common.module';
     StoragesModule,
     DestinationsModule,
     OrdersNotificationsModule,
+    DriverLocationsModule,
+    RedisModule,
   ],
   controllers: [],
   providers: [

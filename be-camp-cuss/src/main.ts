@@ -7,19 +7,29 @@ import {
 } from '@nestjs/common';
 import { ValidationError } from 'class-validator';
 import { ConfigService } from '@nestjs/config';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { AppLoggerService } from './common/loggers/app-logger.service';
 import { UserContextInterceptor } from './common/interceptors/user-context.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { RequestContextService } from './common/contexts/request-context.service';
+import { AppLoggerService } from './common/loggers/app-logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    cors: true,
-  });
-
-  const configService = app.get(ConfigService);
+  const app = await NestFactory.create(AppModule, { cors: true });
+  const config = app.get(ConfigService);
   const logger = app.get(AppLoggerService);
+
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.REDIS,
+    options: {
+      host: config.get<string>('REDIS_HOST') ?? 'localhost',
+      port: config.get<number>('REDIS_PORT') ?? 6379,
+      retryAttempts: 5,
+      retryDelay: 3000,
+    },
+  });
+  await app.startAllMicroservices();
 
   app.setGlobalPrefix('api');
 
@@ -47,6 +57,7 @@ async function bootstrap() {
     new ResponseInterceptor(),
     new UserContextInterceptor(app.get(RequestContextService)),
   );
+
   app.useGlobalFilters(app.get(HttpExceptionFilter));
 
   app.enableVersioning({
@@ -55,11 +66,11 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: configService.get<string>('FRONTEND_URL') ?? '*',
+    origin: config.get<string>('FRONTEND_URL') ?? '*',
     credentials: true,
   });
 
-  const port = configService.get<number>('PORT') ?? 3000;
+  const port = config.get<number>('PORT') ?? 3000;
   await app.listen(port);
   logger.log(`Server berjalan di port ${port}`, 'Bootstrap');
 }
