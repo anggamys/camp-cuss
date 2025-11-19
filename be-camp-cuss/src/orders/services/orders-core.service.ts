@@ -9,10 +9,11 @@ import { UpdateOrderDto } from '../dto/update-order.dto';
 import { Order, OrderStatus } from '@prisma/client';
 import { OrdersBroadcastService } from './orders-broadcast.service';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
+import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class OrdersCoreService {
-  private readonly context = 'OrdersCoreService';
+  private readonly context = OrdersCoreService.name;
 
   constructor(
     private readonly logger: AppLoggerService,
@@ -28,13 +29,19 @@ export class OrdersCoreService {
       const destination = await this.prisma.destination.findUnique({
         where: { id: dto.destination_id },
       });
+
       if (!destination) {
         this.logger.warn(
           `User ${customerId} mencoba membuat pesanan ke tujuan tidak valid (${dto.destination_id})`,
           this.context,
         );
+
         throw new HttpException(
-          'Tempat tujuan tidak ditemukan',
+          {
+            message: 'Tempat tujuan tidak ditemukan',
+            error: '',
+          },
+
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -70,15 +77,24 @@ export class OrdersCoreService {
     }
   }
 
-  async findAll(): Promise<Order[]> {
+  async findAll(role: Role, userId: number): Promise<Order[]> {
     try {
+      let where = {};
+      if (role === Role.driver) {
+        where = { driver_id: userId };
+      } else if (role === Role.customer) {
+        where = { user_id: userId };
+      }
       const orders = await this.prisma.order.findMany({
+        where,
         orderBy: { created_at: 'desc' },
       });
+
       this.logger.debug(
-        `Mengambil ${orders.length} pesanan dari database`,
+        `Mengambil ${orders.length} pesanan dari database untuk role ${role}`,
         this.context,
       );
+
       return orders;
     } catch (e) {
       this.logger.error(
@@ -86,6 +102,7 @@ export class OrdersCoreService {
         e instanceof Error ? e.stack : String(e),
         this.context,
       );
+
       if (e instanceof HttpException) throw e;
       PrismaErrorHelper.handle(e);
     }
@@ -101,6 +118,7 @@ export class OrdersCoreService {
           HttpStatus.NOT_FOUND,
         );
       }
+
       return order;
     } catch (e) {
       this.logger.error(

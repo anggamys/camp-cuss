@@ -42,9 +42,9 @@ export class OrdersController {
   }
 
   @Get()
-  @Roles(Role.admin)
-  async findAll() {
-    const orders = await this.ordersCore.findAll();
+  @Roles(Role.admin, Role.customer, Role.driver)
+  async findAll(@User('role') role: Role, @User('id') userId: number) {
+    const orders = await this.ordersCore.findAll(role, userId);
     return {
       status: 'success',
       message: 'Daftar pesanan berhasil diambil',
