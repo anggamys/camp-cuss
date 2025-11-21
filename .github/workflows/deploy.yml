@@ -26,12 +26,19 @@ jobs:
           script: |
             set -eo pipefail
             cd /opt/be-camp-cuss
+
+            echo "Login ke GHCR..."
+            echo "${{ secrets.GHCR_TOKEN }}" | sudo docker login ghcr.io -u ${{ secrets.GHCR_USERNAME }} --password-stdin
+
             echo "Pulling latest Docker images..."
             sudo docker compose pull
+
             echo "Restarting application with docker compose..."
             sudo docker compose up -d --remove-orphans
+
             echo "Pruning unused Docker resources..."
             sudo docker system prune -f
+
             echo "Deployment completed successfully."
 
       - name: Verify Healthcheck
