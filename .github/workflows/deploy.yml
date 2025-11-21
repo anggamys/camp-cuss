@@ -1,0 +1,50 @@
+name: Deploy Application
+
+on:
+  workflow_run:
+    workflows:
+      - Build and Publish Docker Image
+      - Preparation for CI/CD
+    types:
+      - completed
+
+jobs:
+  deploy:
+    name: Deploy to Production Server
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Log Deployment Start
+        run: echo "Starting deployment to production server..."
+
+      - name: Deploy Application via SSH
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -eo pipefail
+            cd /opt/be-camp-cuss
+            echo "Pulling latest Docker images..."
+            sudo docker compose pull
+            echo "Restarting application with docker compose..."
+            sudo docker compose up -d --remove-orphans
+            echo "Pruning unused Docker resources..."
+            sudo docker system prune -f
+            echo "Deployment completed successfully."
+
+      - name: Verify Healthcheck
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            echo "Verifying application health..."
+            sleep 10
+            sudo docker ps --filter "name=be-camp-cuss" --filter "health=healthy" || {
+              echo "Container is not healthy!"
+              exit 1
+            }
