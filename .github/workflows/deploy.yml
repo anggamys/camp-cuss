@@ -4,7 +4,6 @@ on:
   workflow_run:
     workflows:
       - Build and Publish Docker Image
-      - Preparation for CI/CD
     types:
       - completed
 
