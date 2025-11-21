@@ -5,7 +5,7 @@ import { AppLoggerService } from '../loggers/app-logger.service';
 
 @Injectable()
 export class RedisBaseService {
-  CONTEXT = 'RedisBaseService';
+  protected readonly context: string;
 
   constructor(
     @Inject(REDIS_CLIENT) protected readonly redis: Redis,
@@ -15,12 +15,12 @@ export class RedisBaseService {
   async publish(channel: string, payload: unknown) {
     try {
       await this.redis.publish(channel, JSON.stringify(payload));
-      this.logger.debug(`Redis publish -> ${channel}`, this.CONTEXT);
+      this.logger.debug(`Redis publish -> ${channel}`, this.context);
     } catch (err) {
       this.logger.error(
         `Failed publish ${channel}: ${err instanceof Error ? err.message : String(err)}`,
         err instanceof Error ? err.stack : undefined,
-        this.CONTEXT,
+        this.context,
       );
     }
   }

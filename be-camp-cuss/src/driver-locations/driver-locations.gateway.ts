@@ -17,15 +17,7 @@ import { UpdateDriverLocationDto } from './dto/update-driver-location.dto';
 import { TopicDriverLocationSocketIo } from '../common/enums/topic-socket-io.enum';
 import { SocketWithUser } from '../orders-notifications/types/socket-user.interface';
 import { BaseGateway } from '../common/gateways/base.gateway';
-
-interface DriverLocationEventData {
-  driver_id: number;
-  latitude: number;
-  longitude: number;
-  heading?: number;
-  speed?: number;
-  timestamp?: number;
-}
+import { DriverLocationData } from '../common/types/driver.interface';
 
 @WebSocketGateway({ cors: true, namespace: '/driver-locations' })
 export class DriverLocationsGateway extends BaseGateway {
@@ -61,20 +53,29 @@ export class DriverLocationsGateway extends BaseGateway {
   }
 
   @SubscribeMessage('updateDriverLocation')
-  handleUpdateDriverLocation(
+  async handleUpdateDriverLocation(
     @ConnectedSocket() client: SocketWithUser,
     @MessageBody() data: UpdateDriverLocationDto,
   ) {
-    this.safeHandle(client, 'updateDriverLocation', () => {
+    await this.safeHandle(client, 'updateDriverLocation', async () => {
       const driverId = client.user?.id;
       if (!driverId) throw new WsException('User ID tidak ditemukan');
 
-      this.driverLocationsService.updateDriverLocation(driverId, data);
-      return Promise.resolve({ driver_id: driverId, ...data });
+      await this.driverLocationsService.updateDriverLocation(driverId, data);
+      return { driver_id: driverId, ...data };
     });
   }
 
-  broadcastLocation(data: DriverLocationEventData) {
-    this.server.emit(TopicDriverLocationSocketIo.DRIVER_LOCATION_UPDATE, data);
+  broadcastToOrderRoom(room: string, data: DriverLocationData) {
+    this.server
+      .to(room)
+      .emit(TopicDriverLocationSocketIo.DRIVER_ACTIVE_LOCATION_UPDATE, data);
+  }
+
+  broadcastToAvailableDrivers(data: DriverLocationData) {
+    this.server.emit(
+      TopicDriverLocationSocketIo.DRIVER_AVAILABLE_LOCATION_UPDATE,
+      data,
+    );
   }
 }

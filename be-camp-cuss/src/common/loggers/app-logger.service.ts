@@ -54,12 +54,32 @@ export class AppLoggerService implements LoggerService {
     });
   }
 
+  private getCallerContext(): string | undefined {
+    // Try to extract the caller class name from the stack trace
+    const err = new Error();
+    if (err.stack) {
+      const stackLines = err.stack.split('\n');
+      // Find the first stack line outside AppLoggerService
+      for (const line of stackLines) {
+        if (!line.includes('AppLoggerService') && /at (\w+)/.test(line)) {
+          const match = line.match(/at (\w+)/);
+          if (match && match[1]) {
+            return match[1];
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+
   private enrich(message: string, context?: string): string {
     const ctx = this.context.getAll();
+    // Use provided context, or fallback to caller context
+    const label = context || this.getCallerContext();
     const prefix = [
       ctx?.requestId ? `[RID:${ctx.requestId}]` : '',
       ctx?.userId ? `[UID:${ctx.userId}]` : '',
-      context ? `[${context}]` : '',
+      label ? `[${label}]` : '',
     ]
       .filter((item): item is string => Boolean(item))
       .join(' ');

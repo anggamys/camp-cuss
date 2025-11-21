@@ -1,12 +1,9 @@
-export enum GlobalTopic {
-  ERROR = 'error',
-}
-
-export enum TopicDriverLocationSocketIo {
-  DRIVER_LOCATION_UPDATE = 'driver_location_update',
-}
-
 export enum WsSystemSuffix {
   ACK = ':ack',
   ERROR = ':error',
+}
+
+export enum TopicDriverLocationSocketIo {
+  DRIVER_ACTIVE_LOCATION_UPDATE = 'driver:active:location:update',
+  DRIVER_AVAILABLE_LOCATION_UPDATE = 'driver:available:location:update',
 }

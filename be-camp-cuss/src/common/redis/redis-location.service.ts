@@ -3,38 +3,69 @@ import { RedisBaseService } from './redis-base.service';
 import { AppLoggerService } from '../loggers/app-logger.service';
 import { REDIS_CLIENT } from './redis.provider';
 import { Redis } from 'ioredis';
-
-export interface DriverLocationData {
-  driver_id: number;
-  latitude: number;
-  longitude: number;
-  heading?: number;
-  speed?: number;
-  timestamp?: number;
-}
+import { DriverLocationData } from '../types/driver.interface';
+import { RedisCacheKey, RedisChannel } from '../enums/redis.enum';
 
 @Injectable()
 export class RedisLocationService extends RedisBaseService {
-  private readonly channel = 'driver:location';
-  private readonly cacheKeyPrefix = 'driver:location:';
-  private readonly cacheTTL = 60; // detik
+  protected readonly context = 'RedisLocationService';
+  private readonly baseTTL = 60;
 
   constructor(@Inject(REDIS_CLIENT) redis: Redis, logger: AppLoggerService) {
     super(redis, logger);
   }
 
-  async publishLocationUpdate(data: DriverLocationData): Promise<void> {
+  async publishActiveLocation(data: DriverLocationData): Promise<void> {
     const payload = { ...data, timestamp: data.timestamp ?? Date.now() };
-    await this.publish(this.channel, payload);
-    await this.set(
-      `${this.cacheKeyPrefix}${data.driver_id}`,
-      payload,
-      this.cacheTTL,
+
+    await Promise.all([
+      this.publish(RedisChannel.DRIVER_ACTIVE_LOCATION, payload),
+      this.set(
+        `${RedisCacheKey.DRIVER_ACTIVE_LOCATION}${data.driver_id}`,
+        payload,
+        this.baseTTL,
+      ),
+    ]);
+
+    this.logger.debug(
+      `Lokasi driver ${data.driver_id} dipublish ke channel aktif`,
+      this.context,
     );
   }
 
-  async getLastLocation(driverId: number): Promise<DriverLocationData | null> {
-    const cache = await this.get(`${this.cacheKeyPrefix}${driverId}`);
+  async publishAvailableLocation(data: DriverLocationData): Promise<void> {
+    const payload = { ...data, timestamp: data.timestamp ?? Date.now() };
+
+    await Promise.all([
+      this.publish(RedisChannel.DRIVER_AVAILABLE_LOCATION, payload),
+      this.set(
+        `${RedisCacheKey.DRIVER_AVAILABLE_LOCATION}${data.driver_id}`,
+        payload,
+        this.baseTTL,
+      ),
+    ]);
+
+    this.logger.debug(
+      `Lokasi driver ${data.driver_id} dipublish ke channel available`,
+      this.context,
+    );
+  }
+
+  async getLastActiveLocation(
+    driverId: number,
+  ): Promise<DriverLocationData | null> {
+    const cache = await this.get(
+      `${RedisCacheKey.DRIVER_ACTIVE_LOCATION}${driverId}`,
+    );
+    return cache ? (JSON.parse(cache) as DriverLocationData) : null;
+  }
+
+  async getLastAvailableLocation(
+    driverId: number,
+  ): Promise<DriverLocationData | null> {
+    const cache = await this.get(
+      `${RedisCacheKey.DRIVER_AVAILABLE_LOCATION}${driverId}`,
+    );
     return cache ? (JSON.parse(cache) as DriverLocationData) : null;
   }
 }
