@@ -15,6 +15,18 @@ jobs:
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main  # pastikan ambil branch main
+
+      - name: Verify docker-compose.yml exists
+        run: |
+          if [ ! -f "be-camp-cuss/docker-compose.yml" ]; then
+            echo "❌ File be-camp-cuss/docker-compose.yml tidak ditemukan"
+            exit 1
+          else
+            echo "✅ File ditemukan: be-camp-cuss/docker-compose.yml"
+          fi
 
       - name: Upload docker-compose.yml to Server
         uses: appleboy/scp-action@v0.1.4
