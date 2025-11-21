@@ -17,29 +17,33 @@ jobs:
       - name: Log Deployment Start
         run: echo "Starting deployment to production server..."
 
-      - name: Deploy Application via SSH
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            set -eo pipefail
+            set -e
             cd /opt/be-camp-cuss
-
             echo "Login ke GHCR..."
-            echo "${{ secrets.GHCR_TOKEN }}" | sudo docker login ghcr.io -u ${{ secrets.GHCR_USERNAME }} --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | sudo docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
 
-            echo "Pulling latest Docker images..."
-            sudo docker compose pull
+            echo "Menarik image terbaru..."
+            if ! sudo docker compose pull; then
+              echo "Image belum tersedia, mencoba menarik ulang dengan tag commit..."
+              sudo docker compose pull ghcr.io/${{ secrets.GHCR_USERNAME }}/be-camp-cuss:$(sudo docker images --format '{{.Tag}}' | head -n 1) || {
+                echo "Gagal menarik image, pastikan image sudah dipublish ke GHCR"
+                exit 1
+              }
+            fi
 
-            echo "Restarting application with docker compose..."
+            echo "Menjalankan ulang container..."
             sudo docker compose up -d --remove-orphans
 
-            echo "Pruning unused Docker resources..."
-            sudo docker system prune -f
-
-            echo "Deployment completed successfully."
+            echo "Membersihkan resource yang tidak digunakan..."
+            sudo docker system prune -af
+            echo "Deployment selesai."
 
       - name: Verify Healthcheck
         uses: appleboy/ssh-action@v0.1.6
@@ -48,9 +52,11 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            echo "Verifying application health..."
             sleep 10
-            sudo docker ps --filter "name=be-camp-cuss" --filter "health=healthy" || {
-              echo "Container is not healthy!"
+            STATUS=$(sudo docker inspect --format='{{.State.Health.Status}}' be-camp-cuss || echo "notfound")
+            if [ "$STATUS" != "healthy" ]; then
+              echo "Container tidak sehat atau tidak ditemukan. Status: $STATUS"
+              sudo docker ps
               exit 1
-            }
+            fi
+            echo "Container dalam kondisi sehat."
