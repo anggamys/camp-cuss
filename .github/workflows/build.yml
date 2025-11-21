@@ -16,21 +16,6 @@ jobs:
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # penting agar git diff bisa membandingkan HEAD dan origin/main
-
-      # Deteksi perubahan di be-camp-cuss/
-      - name: Detect be-camp-cuss Changes
-        id: be_changes_check
-        run: |
-          CHANGED=$(git diff --name-only origin/main...HEAD || echo "")
-          echo "Changed files:"
-          echo "$CHANGED"
-          if echo "$CHANGED" | grep -q '^be-camp-cuss/'; then
-            echo "be_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "be_changes=false" >> $GITHUB_OUTPUT
-          fi
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -39,9 +24,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build dan push image hanya jika ada perubahan di be-camp-cuss
       - name: Build & Push Docker Image
-        if: ${{ steps.be_changes_check.outputs.be_changes == 'true' }}
         uses: docker/build-push-action@v5
         with:
           context: ./be-camp-cuss
