@@ -9,15 +9,14 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Production Server
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Log Deployment Start
-        run: echo "Starting deployment to production server..."
+      - name: Start Deployment
+        run: echo "Deploying to production..."
 
-      - name: Deploy via SSH
+      - name: SSH Deploy
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -26,26 +25,21 @@ jobs:
           script: |
             set -e
             cd /opt/be-camp-cuss
-            echo "Login ke GHCR..."
-            echo "${{ secrets.GHCR_TOKEN }}" | sudo docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+            echo "Login GHCR..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | sudo docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            echo "Menarik image terbaru..."
-            if ! sudo docker compose pull; then
-              echo "Image belum tersedia, mencoba menarik ulang dengan tag commit..."
-              sudo docker compose pull ghcr.io/${{ secrets.GHCR_USERNAME }}/be-camp-cuss:$(sudo docker images --format '{{.Tag}}' | head -n 1) || {
-                echo "Gagal menarik image, pastikan image sudah dipublish ke GHCR"
-                exit 1
-              }
-            fi
+            echo "Pulling image..."
+            sudo docker pull ghcr.io/${{ github.repository_owner }}/be-camp-cuss:latest
 
-            echo "Menjalankan ulang container..."
-            sudo docker compose up -d --remove-orphans
+            echo "Recreating container..."
+            sudo docker compose up -d --force-recreate --remove-orphans
 
-            echo "Membersihkan resource yang tidak digunakan..."
+            echo "Cleaning up..."
             sudo docker system prune -af
-            echo "Deployment selesai."
 
-      - name: Verify Healthcheck
+            echo "Deployment complete."
+
+      - name: Verify Health
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -55,8 +49,8 @@ jobs:
             sleep 10
             STATUS=$(sudo docker inspect --format='{{.State.Health.Status}}' be-camp-cuss || echo "notfound")
             if [ "$STATUS" != "healthy" ]; then
-              echo "Container tidak sehat atau tidak ditemukan. Status: $STATUS"
+              echo "Container unhealthy or not found (status: $STATUS)"
               sudo docker ps
               exit 1
             fi
-            echo "Container dalam kondisi sehat."
+            echo "Container healthy."
