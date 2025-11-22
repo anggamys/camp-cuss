@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { ValidationError } from 'class-validator';
 import { ConfigService } from '@nestjs/config';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { UserContextInterceptor } from './common/interceptors/user-context.interceptor';
@@ -19,21 +18,6 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });
   const config = app.get(ConfigService);
   const logger = app.get(AppLoggerService);
-
-  // Jalankan microservice Redis
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.REDIS,
-    options: {
-      host: config.get<string>('REDIS_HOST'),
-      port: config.get<number>('REDIS_PORT'),
-      retryAttempts: 5,
-      retryDelay: 3000,
-    },
-  });
-
-  // Mulai microservice SEBELUM listen utama
-  await app.startAllMicroservices();
-  logger.log('Redis microservice listener aktif', 'Bootstrap');
 
   // Prefix dan versi API
   app.setGlobalPrefix('api');
