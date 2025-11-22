@@ -4,18 +4,17 @@ import { RedisBaseService } from './redis-base.service';
 import { RedisLocationService } from './redis-location.service';
 import { RedisCacheService } from './redis-cache.service';
 import { LoggerModule } from '../loggers/logger.module';
-
 @Global()
 @Module({
   imports: [LoggerModule],
   providers: [
-    RedisProvider,
+    ...RedisProvider,
     RedisBaseService,
     RedisLocationService,
     RedisCacheService,
   ],
   exports: [
-    RedisProvider,
+    ...RedisProvider,
     RedisBaseService,
     RedisLocationService,
     RedisCacheService,
