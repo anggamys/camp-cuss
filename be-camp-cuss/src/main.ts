@@ -20,19 +20,26 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const logger = app.get(AppLoggerService);
 
+  // Jalankan microservice Redis
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.REDIS,
     options: {
-      host: config.get<string>('REDIS_HOST') ?? '',
+      host: config.get<string>('REDIS_HOST'),
       port: config.get<number>('REDIS_PORT'),
       retryAttempts: 5,
       retryDelay: 3000,
     },
   });
+
+  // Mulai microservice SEBELUM listen utama
   await app.startAllMicroservices();
+  logger.log('Redis microservice listener aktif', 'Bootstrap');
 
+  // Prefix dan versi API
   app.setGlobalPrefix('api');
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
+  // Pipe global
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -53,23 +60,20 @@ async function bootstrap() {
     }),
   );
 
+  // Interceptor & Filter
   app.useGlobalInterceptors(
     new ResponseInterceptor(),
     new UserContextInterceptor(app.get(RequestContextService)),
   );
-
   app.useGlobalFilters(app.get(HttpExceptionFilter));
 
-  app.enableVersioning({
-    type: VersioningType.URI,
-    defaultVersion: '1',
-  });
-
+  // CORS
   app.enableCors({
     origin: config.get<string>('FRONTEND_URL') ?? '*',
     credentials: true,
   });
 
+  // Jalankan HTTP server
   const port = config.get<number>('PORT') ?? 3000;
   await app.listen(port);
   logger.log(`Server berjalan di port ${port}`, 'Bootstrap');
