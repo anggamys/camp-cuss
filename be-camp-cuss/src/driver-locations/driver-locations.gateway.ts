@@ -61,6 +61,11 @@ export class DriverLocationsGateway extends BaseGateway {
       const driverId = client.user?.id;
       if (!driverId) throw new WsException('User ID tidak ditemukan');
 
+      this.logger.log(
+        `Menerima lokasi terbaru dari driver ID: ${driverId}`,
+        this.context,
+      );
+
       await this.driverLocationsService.updateDriverLocation(driverId, data);
       return { driver_id: driverId, ...data };
     });

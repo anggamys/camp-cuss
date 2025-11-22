@@ -46,7 +46,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            sleep 10
+            sleep 1000
             STATUS=$(sudo docker inspect --format='{{.State.Health.Status}}' be-camp-cuss || echo "notfound")
             if [ "$STATUS" != "healthy" ]; then
               echo "Container unhealthy or not found (status: $STATUS)"

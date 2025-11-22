@@ -46,7 +46,7 @@ export class RedisLocationService extends RedisBaseService {
     ]);
 
     this.logger.debug(
-      `Lokasi driver ${data.driver_id} dipublish ke channel available`,
+      `Lokasi driver ${data.driver_id} dipublish ke channel ${RedisChannel.DRIVER_AVAILABLE_LOCATION}`,
       this.context,
     );
   }
@@ -57,6 +57,7 @@ export class RedisLocationService extends RedisBaseService {
     const cache = await this.get(
       `${RedisCacheKey.DRIVER_ACTIVE_LOCATION}${driverId}`,
     );
+
     return cache ? (JSON.parse(cache) as DriverLocationData) : null;
   }
 
