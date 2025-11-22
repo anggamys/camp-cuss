@@ -71,6 +71,19 @@ export class DriverLocationsGateway extends BaseGateway {
     });
   }
 
+  @SubscribeMessage('joinOrderRoom')
+  handleJoinOrderRoom(
+    @ConnectedSocket() client: SocketWithUser,
+    @MessageBody() data: { order_id: number },
+  ) {
+    const room = `order:${data.order_id}`;
+    void client.join(room);
+
+    this.logger.log(`Client ${client.id} join room ${room}`, this.context);
+
+    return { joined: room };
+  }
+
   broadcastToOrderRoom(room: string, data: DriverLocationData) {
     this.server
       .to(room)
