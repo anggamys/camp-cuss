@@ -54,7 +54,7 @@ export class DriverLocationsService {
         const location = { ...baseLocation, order_id: activeOrder.id };
         await this.redisLocation.publishActiveLocation(location);
 
-        this.logger.debug(
+        this.logger.log(
           `Lokasi driver ${driverId} (order ${activeOrder.id}) dipublish ke channel aktif`,
           this.context,
         );
@@ -62,13 +62,8 @@ export class DriverLocationsService {
         // publish ke channel available
         await this.redisLocation.publishAvailableLocation(baseLocation);
 
-        this.logger.debug(
-          `Lokasi driver ${driverId} dipublish ke channel available`,
-          this.context,
-        );
-
         this.logger.log(
-          `Driver ${driverId} tidak memiliki order aktif, lokasi dipublish ke channel available`,
+          `Lokasi driver ${driverId} dipublish ke channel available`,
           this.context,
         );
       }

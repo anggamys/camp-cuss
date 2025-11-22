@@ -45,7 +45,7 @@ export class RedisLocationService extends RedisBaseService {
       ),
     ]);
 
-    this.logger.debug(
+    this.logger.log(
       `Lokasi driver ${data.driver_id} dipublish ke channel ${RedisChannel.DRIVER_AVAILABLE_LOCATION}`,
       this.context,
     );

@@ -52,10 +52,11 @@ export class DriverLocationsListener implements OnModuleInit, OnModuleDestroy {
           }
 
           if (channel === String(RedisChannel.DRIVER_AVAILABLE_LOCATION)) {
-            this.logger.debug(
+            this.logger.log(
               `Broadcast lokasi driver ${data.driver_id} ke channel ${channel}`,
               this.context,
             );
+
             this.gateway.broadcastToAvailableDrivers(data);
           }
         } catch (err) {
