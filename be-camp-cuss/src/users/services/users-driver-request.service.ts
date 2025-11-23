@@ -3,9 +3,9 @@ import { PrismaService } from '../../prisma/prisma.services';
 import { UserRole, ApprovalStatus } from '@prisma/client';
 import { PrismaErrorHelper } from '../../common/helpers/prisma-error.helper';
 import {
-  CreateRequestDriverDto,
+  CreateDriverRequest,
   ResponseCreateRequestDriverDto,
-} from '../dto/create-approve-driver.dto';
+} from '../dto/create-driver-request.dto';
 import {
   ApproveDriverRequestDto,
   ResponseApproveDriverRequestDto,
@@ -14,17 +14,17 @@ import { DriverRequestItemDto } from '../dto/list-driver-requests.dto';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 @Injectable()
-export class UsersApprovalService {
-  private readonly context = UsersApprovalService.name;
+export class UsersDriverRequestService {
+  private readonly context = UsersDriverRequestService.name;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: AppLoggerService,
   ) {}
 
-  async requestDriver(
+  async createDriverRequest(
     user_id: number,
-    dto: CreateRequestDriverDto,
+    dto: CreateDriverRequest,
   ): Promise<ResponseCreateRequestDriverDto> {
     try {
       const user = await this.prisma.user.findUnique({
@@ -64,6 +64,7 @@ export class UsersApprovalService {
           `Incomplete documents for driver request (user_id: ${user_id})`,
           this.context,
         );
+
         throw new HttpException(
           'Lengkapi seluruh dokumen sebelum mengajukan permintaan driver',
           HttpStatus.BAD_REQUEST,
@@ -117,7 +118,7 @@ export class UsersApprovalService {
     }
   }
 
-  async listRequests(): Promise<DriverRequestItemDto[]> {
+  async findAllDriverRequests(): Promise<DriverRequestItemDto[]> {
     try {
       const requests = await this.prisma.driverRequest.findMany({
         where: { status: ApprovalStatus.pending },
@@ -166,7 +167,7 @@ export class UsersApprovalService {
     }
   }
 
-  async approveRequest(
+  async approveDriverRequest(
     request_id: number,
     admin_id: number,
     dto: ApproveDriverRequestDto,

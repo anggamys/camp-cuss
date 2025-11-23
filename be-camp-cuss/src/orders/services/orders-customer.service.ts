@@ -1,8 +1,9 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
 import { PrismaErrorHelper } from '../../common/helpers/prisma-error.helper';
-import { Order, OrderStatus } from '@prisma/client';
+import { Order } from '@prisma/client';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
+import { OrderStatus } from '../../common/enums/order.enum';
 
 @Injectable()
 export class OrdersCustomerService {
@@ -40,7 +41,7 @@ export class OrdersCustomerService {
       if (order.user_id !== userId)
         throw new HttpException('Tidak berwenang', HttpStatus.FORBIDDEN);
 
-      if (order.status === OrderStatus.completed)
+      if (order.status === String(OrderStatus.completed))
         throw new HttpException(
           'Pesanan sudah selesai',
           HttpStatus.BAD_REQUEST,
@@ -48,7 +49,7 @@ export class OrdersCustomerService {
 
       const updated = await this.prisma.order.update({
         where: { id: orderId },
-        data: { status: OrderStatus.cancelled, driver_id: null },
+        data: { status: OrderStatus.canceled, driver_id: null },
       });
 
       this.logger.warn(

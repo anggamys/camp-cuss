@@ -31,6 +31,22 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(UserRole, { message: 'Role tidak valid' })
   role: UserRole;
+
+  @IsOptional()
+  @IsString({ message: 'Photo profile harus berupa string' })
+  photo_profile?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Photo driving license harus berupa string' })
+  photo_driving_license?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Photo student card harus berupa string' })
+  photo_student_card?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Photo ID card harus berupa string' })
+  photo_id_card?: string;
 }
 
 export class CreateUserResponseDto {

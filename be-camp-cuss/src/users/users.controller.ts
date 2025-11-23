@@ -15,17 +15,17 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { ApproveDriverRequestDto } from './dto/approve-driver-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { User } from '../common/decorators/user.decorator';
-import { UsersApprovalService } from './services/users-approval.service';
+import { UsersDriverRequestService } from './services/users-driver-request.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
-import { CreateRequestDriverDto } from './dto/create-approve-driver.dto';
+import { CreateDriverRequest } from './dto/create-driver-request.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly approvalService: UsersApprovalService,
+    private readonly driverRequestService: UsersDriverRequestService,
   ) {}
 
   @Post()
@@ -44,19 +44,20 @@ export class UsersController {
   @Post('request-driver')
   async requestDriver(
     @User('id') userId: number,
-    @Body() dto: CreateRequestDriverDto,
+    @Body() dto: CreateDriverRequest,
   ) {
-    const createdRequest = await this.approvalService.requestDriver(
-      userId,
-      dto,
-    );
-    return { message: 'Permintaan driver telah dibuat', data: createdRequest };
+    const createdDriverRequest =
+      await this.driverRequestService.createDriverRequest(userId, dto);
+    return {
+      message: 'Permintaan driver telah dibuat',
+      data: createdDriverRequest,
+    };
   }
 
   @Roles(Role.admin)
   @Get('driver-requests')
   async listDriverRequests() {
-    const requests = await this.approvalService.listRequests();
+    const requests = await this.driverRequestService.findAllDriverRequests();
     if (requests.length === 0) {
       return { message: 'Tidak ada permintaan driver', data: [] };
     }
@@ -67,12 +68,12 @@ export class UsersController {
   @Roles(Role.admin)
   @Post('driver-requests/:id/approve')
   async approveDriverRequest(
-    @Param('id', ParseIntPipe) requestId: number,
+    @Param('id', ParseIntPipe) driverRequestId: number,
     @Body() dto: ApproveDriverRequestDto,
     @User('id') adminId: number,
   ) {
-    const result = await this.approvalService.approveRequest(
-      requestId,
+    const result = await this.driverRequestService.approveDriverRequest(
+      driverRequestId,
       adminId,
       dto,
     );

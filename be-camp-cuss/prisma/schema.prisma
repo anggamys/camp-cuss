@@ -45,9 +45,9 @@ model DriverRequest {
   user_id       Int
   user          User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
   status        ApprovalStatus    @default(pending)
-  user_notes    String?         
-  admin_notes   String?        
-  approved_by   Int?            
+  user_notes    String?
+  admin_notes   String?
+  approved_by   Int?
   admin         User?             @relation("AdminApprover", fields: [approved_by], references: [id])
   created_at    DateTime          @default(now())
   updated_at    DateTime          @updatedAt
@@ -71,22 +71,30 @@ model Destination {
 }
 
 model Order {
-  id                  Int           @id @default(autoincrement())
+  id                  Int            @id @default(autoincrement())
+  order_code          String?        @unique
   user_id             Int
   driver_id           Int?
   destination_id      Int
   pick_up_location    String
   pick_up_latitude    Float
   pick_up_longitude   Float
-  status              OrderStatus   @default(pending)
-  created_at          DateTime      @default(now())
-  updated_at          DateTime      @updatedAt
+  status              OrderStatus    @default(pending)
+  payment_status      PaymentStatus  @default(pending)
+  payment_method      String?
+  total_price         Float          @default(0)
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
 
-  user                User          @relation("UserOrders", fields: [user_id], references: [id])
-  driver              User?         @relation("DriverOrders", fields: [driver_id], references: [id])
-  destination         Destination   @relation(fields: [destination_id], references: [id])
+  user                User           @relation("UserOrders", fields: [user_id], references: [id])
+  driver              User?          @relation("DriverOrders", fields: [driver_id], references: [id])
+  destination         Destination    @relation(fields: [destination_id], references: [id])
 
   @@map("orders")
+  @@index([status])
+  @@index([payment_status])
+  @@index([driver_id])
+  @@index([user_id])
 }
 
 model DriverLocation {
@@ -121,8 +129,14 @@ enum ApprovalStatus {
 
 enum OrderStatus {
   pending
+  canceled
   accepted
-  on_progress
   completed
-  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
 }

@@ -10,6 +10,8 @@ import { Order, OrderStatus } from '@prisma/client';
 import { OrdersBroadcastService } from './orders-broadcast.service';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 import { Role } from '../../common/enums/role.enum';
+import { generateOrderCode } from '../../common/utils/order-code.util';
+import { OrderService } from '../../common/enums/order.enum';
 
 @Injectable()
 export class OrdersCoreService {
@@ -35,13 +37,11 @@ export class OrdersCoreService {
           `User ${customerId} mencoba membuat pesanan ke tujuan tidak valid (${dto.destination_id})`,
           this.context,
         );
-
         throw new HttpException(
           {
             message: 'Tempat tujuan tidak ditemukan',
             error: '',
           },
-
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -50,8 +50,16 @@ export class OrdersCoreService {
         data: { ...dto, user_id: customerId },
       });
 
+      const orderCode = generateOrderCode(OrderService.ride, order.id);
+
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { order_code: orderCode },
+      });
+
       this.logger.log(
         `Pesanan #${order.id} berhasil dibuat oleh user ${customerId}`,
+        this.context,
       );
 
       if (order.status === OrderStatus.pending) {
@@ -59,7 +67,6 @@ export class OrdersCoreService {
           `Menjadwalkan broadcast untuk order #${order.id}`,
           this.context,
         );
-
         this.broadcast.broadcastAndSchedule(order.id, order);
       }
 
@@ -70,7 +77,6 @@ export class OrdersCoreService {
         e instanceof Error ? e.stack : String(e),
         this.context,
       );
-
       if (e instanceof HttpException) throw e;
       PrismaErrorHelper.handle(e);
     }
@@ -90,18 +96,17 @@ export class OrdersCoreService {
       });
 
       this.logger.debug(
-        `Mengambil ${orders.length} pesanan dari database untuk role ${role}`,
+        `Mengambil ${orders.length} pesanan dari database untuk role ${role} (userId: ${userId})`,
         this.context,
       );
 
       return orders;
     } catch (e) {
       this.logger.error(
-        'Gagal mengambil daftar pesanan',
+        `Gagal mengambil daftar pesanan untuk role ${role} (userId: ${userId})`,
         e instanceof Error ? e.stack : String(e),
         this.context,
       );
-
       if (e instanceof HttpException) throw e;
       PrismaErrorHelper.handle(e);
     }

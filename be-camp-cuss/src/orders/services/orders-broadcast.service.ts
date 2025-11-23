@@ -1,8 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
 import { OrdersNotificationsGateway } from '../../orders-notifications/orders-notifications.gateway';
-import { Order, OrderStatus } from '@prisma/client';
+import { Order } from '@prisma/client';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
+import { OrderStatus } from '../../common/enums/order.enum';
 
 @Injectable()
 export class OrdersBroadcastService implements OnModuleInit {
@@ -66,7 +67,7 @@ export class OrdersBroadcastService implements OnModuleInit {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
-    if (!order || order.status !== OrderStatus.pending) {
+    if (!order || order.status !== String(OrderStatus.pending)) {
       this.stopBroadcast(orderId);
       this.logger.log(`Broadcast order #${orderId} dihentikan`);
       return;

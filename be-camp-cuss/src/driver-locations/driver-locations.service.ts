@@ -34,7 +34,7 @@ export class DriverLocationsService {
       const activeOrder = await this.prisma.order.findFirst({
         where: {
           driver_id: driverId,
-          status: { in: ['accepted', 'on_progress'] },
+          status: { in: ['accepted'] },
         },
         select: { id: true },
       });

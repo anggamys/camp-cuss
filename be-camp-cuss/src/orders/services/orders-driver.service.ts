@@ -1,8 +1,9 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
 import { PrismaErrorHelper } from '../../common/helpers/prisma-error.helper';
-import { Order, OrderStatus, UserRole } from '@prisma/client';
+import { Order, UserRole } from '@prisma/client';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
+import { OrderStatus } from '../../common/enums/order.enum';
 
 @Injectable()
 export class OrdersDriverService {
@@ -42,7 +43,7 @@ export class OrdersDriverService {
           );
         }
 
-        if (order.status === OrderStatus.cancelled) {
+        if (order.status === String(OrderStatus.canceled)) {
           this.logger.warn(
             `Pesanan #${orderId} sudah dibatalkan`,
             this.context,
@@ -53,7 +54,7 @@ export class OrdersDriverService {
           );
         }
 
-        if (order.status !== OrderStatus.pending) {
+        if (order.status !== String(OrderStatus.pending)) {
           this.logger.warn(
             `Pesanan #${orderId} tidak dalam status pending`,
             this.context,
@@ -113,7 +114,6 @@ export class OrdersDriverService {
         // cukup warn, bukan error
         this.logger.warn(`Operasi dibatalkan: ${e.message}`, this.context);
       }
-
       throw e;
     }
   }
@@ -145,7 +145,7 @@ export class OrdersDriverService {
         throw new HttpException('Tidak berwenang', HttpStatus.FORBIDDEN);
       }
 
-      if (order.status !== OrderStatus.accepted) {
+      if (order.status !== String(OrderStatus.accepted)) {
         this.logger.warn(
           `Pesanan #${orderId} belum dalam status accepted`,
           this.context,
