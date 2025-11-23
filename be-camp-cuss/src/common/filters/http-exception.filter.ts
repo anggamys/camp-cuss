@@ -15,6 +15,8 @@ import { RequestContextService } from '../contexts/request-context.service';
 @Injectable()
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logName = HttpExceptionFilter.name;
+
   constructor(
     private readonly logger: AppLoggerService,
     private readonly context: RequestContextService,
@@ -82,7 +84,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = 'Token tidak disertakan atau tidak valid';
       }
     } else if (exception instanceof Error) {
-      // Error runtime biasa
       message = exception.message;
     }
 
@@ -94,15 +95,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const baseLogMsg = `HTTP ${method} ${path} [${status}] - ${message}`;
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(
-        baseLogMsg,
-        (exception as Error)?.stack,
-        'HttpExceptionFilter',
-      );
+      this.logger.error(baseLogMsg, (exception as Error)?.stack, this.logName);
     } else if (status >= HttpStatus.BAD_REQUEST) {
-      this.logger.warn(baseLogMsg, 'HttpExceptionFilter');
+      this.logger.warn(baseLogMsg, this.logName);
     } else {
-      this.logger.log(baseLogMsg, 'HttpExceptionFilter');
+      this.logger.log(baseLogMsg, this.logName);
     }
 
     const errorResponse: ErrorResponse = {

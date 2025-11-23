@@ -1,6 +1,7 @@
 import { Provider } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { AppLoggerService } from '../loggers/app-logger.service';
+import { Env } from '../constants/env.constant';
 
 export const REDIS_CLIENT = 'REDIS_CLIENT';
 export const REDIS_SUBSCRIBER = 'REDIS_SUBSCRIBER';
@@ -10,7 +11,7 @@ export const RedisProvider: Provider[] = [
   {
     provide: REDIS_CLIENT,
     useFactory: (logger: AppLoggerService): Redis => {
-      const url = process.env.REDIS_URL!;
+      const url = Env.REDIS_URL || '';
       const client = new Redis(url);
       client.on('connect', () =>
         logger.log(`[Redis] Publisher connected -> ${url}`, context),

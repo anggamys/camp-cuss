@@ -3,7 +3,6 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
-  Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Socket } from 'socket.io';
@@ -11,6 +10,7 @@ import { ROLES_KEY } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { ApiResponse } from '../../common/types/api-response.interface';
 import { UserPayload } from '../../common/types/user-context.interface';
+import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 interface SocketWithUser extends Socket {
   user?: UserPayload;
@@ -18,9 +18,12 @@ interface SocketWithUser extends Socket {
 
 @Injectable()
 export class WsRolesGuard implements CanActivate {
-  private readonly logger = new Logger(WsRolesGuard.name);
+  private readonly context: string;
 
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly logger: AppLoggerService,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles =
@@ -35,7 +38,10 @@ export class WsRolesGuard implements CanActivate {
     const user = client.user;
 
     if (!user?.role) {
-      this.logger.warn('User role tidak ditemukan pada koneksi WebSocket');
+      this.logger.warn(
+        'User role tidak ditemukan pada koneksi WebSocket',
+        this.context,
+      );
       throw new ForbiddenException(
         this.buildError('Anda tidak memiliki akses ke resource ini', {
           role: ['Data pengguna tidak ditemukan di koneksi WebSocket'],
@@ -46,6 +52,7 @@ export class WsRolesGuard implements CanActivate {
     if (!requiredRoles.includes(user.role as Role)) {
       this.logger.warn(
         `Akses ditolak untuk role: ${user.role}, dibutuhkan: ${requiredRoles.join(', ')}`,
+        this.context,
       );
       throw new ForbiddenException(
         this.buildError('Anda tidak memiliki akses ke resource ini', {

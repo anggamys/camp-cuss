@@ -1,38 +1,42 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { SocketWithUser } from './types/socket-user.interface';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { JwtEnvKeys } from '../common/enums/env-keys.enum';
 import { UserPayload } from '../common/types/user-context.interface';
 import {
   TokenExpiredError,
   JsonWebTokenError,
   NotBeforeError,
 } from 'jsonwebtoken';
+import { AppLoggerService } from '../common/loggers/app-logger.service';
+import { Env } from '../common/constants/env.constant';
 
 @Injectable()
 export class OrdersConnectionHandler {
-  private readonly logger = new Logger(OrdersConnectionHandler.name);
+  private readonly context = OrdersConnectionHandler.name;
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly config: ConfigService,
+    private readonly logger: AppLoggerService,
   ) {}
 
   handleConnection(client: SocketWithUser): void {
     const token = this.extractToken(client);
     if (!token) {
-      this.logger.warn('Koneksi tanpa token, ditolak');
+      this.logger.warn('Koneksi tanpa token, ditolak', this.context);
+
       client.emit('error', { message: 'Token tidak disertakan' });
+
       client.disconnect();
       return;
     }
 
     try {
-      const secret = this.config.get<string>(JwtEnvKeys.JWT_ACCESS_SECRET, '');
-      if (!secret) throw new Error('JWT secret tidak ditemukan');
+      const accessSecret = Env.JWT_ACCESS_SECRET;
 
-      const payload = this.jwtService.verify<UserPayload>(token, { secret });
+      const payload = this.jwtService.verify<UserPayload>(token, {
+        secret: accessSecret,
+      });
+
       client.user = payload;
 
       this.logger.log(
@@ -48,7 +52,8 @@ export class OrdersConnectionHandler {
               ? 'Token tidak valid'
               : 'Autentikasi gagal';
 
-      this.logger.warn(`Koneksi gagal: ${msg}`);
+      this.logger.warn(`Koneksi gagal: ${msg}`, this.context);
+
       client.emit('error', { message: msg });
       client.disconnect();
     }
@@ -57,6 +62,7 @@ export class OrdersConnectionHandler {
   handleDisconnect(client: SocketWithUser): void {
     this.logger.log(
       `Client ${client.user?.username || 'unknown'} terputus dari server`,
+      this.context,
     );
   }
 

@@ -13,18 +13,16 @@ import { SocketWithUser } from './types/socket-user.interface';
 import { OrderAvailableNotificationDto } from './dto/orders-notification.dto';
 import { ToggleOrderSubscriptionDto } from './dto/toggle-order-subs.dto';
 import { WsJwtGuard } from '../auth/guards/ws-jwt.guard';
-// import { WsGlobalExceptionFilter } from '../common/filters/ws-exception.filter';
 import { WsTransformInterceptor } from '../common/interceptors/ws-transform.interceptor';
 import { AppLoggerService } from '../common/loggers/app-logger.service';
 
 @UseGuards(WsJwtGuard)
-// @UseFilters(WsGlobalExceptionFilter)
 @UseInterceptors(WsTransformInterceptor)
 @WebSocketGateway({ cors: true, namespace: '/orders' })
 export class OrdersNotificationsGateway implements OnGatewayInit {
   private serverReady = false;
 
-  private readonly context = 'OrdersNotificationsGateway';
+  private readonly context = OrdersNotificationsGateway.name;
   private readonly activeDrivers = new Set<string>();
 
   constructor(private readonly logger: AppLoggerService) {}

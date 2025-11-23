@@ -9,9 +9,12 @@ import { StoragesService } from '../../storages/storages.service';
 import { StorageUrlHelper } from '../../common/helpers/storage-url.helper';
 import { UsersUploadService } from './users-upload.service';
 import { ValidationHelper } from '../../common/helpers/validation.helper';
+import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 @Injectable()
 export class UsersService {
+  private readonly context = UsersService.name;
+
   private readonly USER_SELECT = {
     id: true,
     username: true,
@@ -26,6 +29,7 @@ export class UsersService {
     private readonly validationHelper: ValidationHelper,
     private readonly storages: StoragesService,
     private readonly usersUploadService: UsersUploadService,
+    private readonly logger: AppLoggerService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<CreateUserResponseDto> {
@@ -36,13 +40,25 @@ export class UsersService {
         'username',
         dto.username,
       );
-
+      this.logger.debug(
+        `Creating user: ${dto.email} / ${dto.username}`,
+        this.context,
+      );
       const hashed = await PasswordHelper.hash(dto.password);
-      return this.prisma.user.create({
+      const created = await this.prisma.user.create({
         data: { ...dto, password: hashed },
         select: { id: true, email: true, username: true },
       });
+      this.logger.log(
+        `User created: ${created.id} (${created.email})`,
+        this.context,
+      );
+      return created;
     } catch (err) {
+      this.logger.error(
+        `Error creating user: ${err instanceof Error ? err.message : err}`,
+        this.context,
+      );
       PrismaErrorHelper.handle(err);
     }
   }
@@ -55,17 +71,22 @@ export class UsersService {
           photo_profile: true,
         },
       });
-
       if (users.length === 0) {
+        this.logger.debug('No users found in findAll', this.context);
         return [];
       }
-
-      // Build URLs for profile photos
-      const storageHelper = StorageUrlHelper.create(this.storages);
+      const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
       const usersWithUrls = await storageHelper.buildFileUrlsForArray(users);
-
+      this.logger.debug(
+        `Returning ${usersWithUrls.length} users from findAll`,
+        this.context,
+      );
       return usersWithUrls as FindUserResponseDto[];
     } catch (error) {
+      this.logger.error(
+        `Error in findAll: ${error instanceof Error ? error.message : error}`,
+        this.context,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -85,18 +106,25 @@ export class UsersService {
           photo_student_card: true,
         },
       });
-
-      if (!user)
+      if (!user) {
+        this.logger.warn(`User not found in findOne (id: ${id})`, this.context);
         throw new HttpException(
           'Pengguna tidak ditemukan',
           HttpStatus.NOT_FOUND,
         );
-
-      const storageHelper = StorageUrlHelper.create(this.storages);
+      }
+      const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
       const userWithUrls = await storageHelper.buildFileUrls(user);
-
+      this.logger.debug(
+        `Returning user from findOne (id: ${id})`,
+        this.context,
+      );
       return userWithUrls as FindUserResponseDto;
     } catch (error) {
+      this.logger.error(
+        `Error in findOne (id: ${id}): ${error instanceof Error ? error.message : error}`,
+        this.context,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -110,23 +138,33 @@ export class UsersService {
     dto: UpdateUserDto,
   ): Promise<UpdateUserResponseDto> {
     try {
-      if (accessUserId !== id)
+      if (accessUserId !== id) {
+        this.logger.warn(
+          `Access denied for update (accessUserId: ${accessUserId}, id: ${id})`,
+          this.context,
+        );
         throw new HttpException('Akses ditolak', HttpStatus.FORBIDDEN);
-
+      }
       const existing = await this.prisma.user.findUnique({ where: { id } });
-      if (!existing)
+      if (!existing) {
+        this.logger.warn(`User not found in update (id: ${id})`, this.context);
         throw new HttpException('User tidak ditemukan', HttpStatus.NOT_FOUND);
-
+      }
       const password = dto.password
         ? await PasswordHelper.hash(dto.password)
         : existing.password;
-
-      return this.prisma.user.update({
+      const updated = await this.prisma.user.update({
         where: { id },
         data: { ...dto, password },
         select: this.USER_SELECT,
       });
+      this.logger.log(`User updated (id: ${id})`, this.context);
+      return updated;
     } catch (error) {
+      this.logger.error(
+        `Error in update (id: ${id}): ${error instanceof Error ? error.message : error}`,
+        this.context,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -137,10 +175,14 @@ export class UsersService {
   async remove(id: number): Promise<{ message: string }> {
     try {
       await this.usersUploadService.deleteAllUserFiles(id);
-
       await this.prisma.user.delete({ where: { id } });
+      this.logger.log(`User deleted (id: ${id})`, this.context);
       return { message: `Pengguna ${id} dihapus` };
     } catch (error) {
+      this.logger.error(
+        `Error in remove (id: ${id}): ${error instanceof Error ? error.message : error}`,
+        this.context,
+      );
       PrismaErrorHelper.handle(error);
     }
   }

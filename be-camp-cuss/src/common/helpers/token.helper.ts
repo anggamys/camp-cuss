@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
 import { User } from '@prisma/client';
-import { JwtEnvKeys } from '../enums/env-keys.enum';
+import { env } from 'process';
 
 interface JwtPayload {
   sub: number;
@@ -12,7 +12,6 @@ interface JwtPayload {
 }
 
 export class TokenHelper {
-  /** Build JWT payload */
   private static buildPayload(user: User): JwtPayload {
     return {
       sub: user.id,
@@ -46,8 +45,8 @@ export class TokenHelper {
   ): Promise<string> {
     const payload = this.buildPayload(user);
     const options: JwtSignOptions = {
-      secret: this.getString(config, JwtEnvKeys.JWT_ACCESS_SECRET),
-      expiresIn: this.getNumber(config, JwtEnvKeys.JWT_ACCESS_EXPIRES),
+      secret: env.JWT_ACCESS_SECRET,
+      expiresIn: Number(env.JWT_ACCESS_EXPIRES),
     };
     return jwt.signAsync(payload, options);
   }
@@ -60,8 +59,8 @@ export class TokenHelper {
   ): Promise<string> {
     const payload = this.buildPayload(user);
     const options: JwtSignOptions = {
-      secret: this.getString(config, JwtEnvKeys.JWT_REFRESH_SECRET),
-      expiresIn: this.getNumber(config, JwtEnvKeys.JWT_REFRESH_EXPIRES),
+      secret: env.JWT_REFRESH_SECRET,
+      expiresIn: Number(env.JWT_REFRESH_EXPIRES),
     };
     return jwt.signAsync(payload, options);
   }
@@ -74,9 +73,7 @@ export class TokenHelper {
     type: 'access' | 'refresh',
   ): T {
     const secret =
-      type === 'access'
-        ? this.getString(config, JwtEnvKeys.JWT_ACCESS_SECRET)
-        : this.getString(config, JwtEnvKeys.JWT_REFRESH_SECRET);
+      type === 'access' ? env.JWT_ACCESS_SECRET : env.JWT_REFRESH_SECRET;
     try {
       return jwt.verify<T>(token, { secret });
     } catch (err) {

@@ -18,12 +18,16 @@ import { PrismaErrorHelper } from '../common/helpers/prisma-error.helper';
 import { Destination, Prisma } from '@prisma/client';
 import { StoragesService } from '../storages/storages.service';
 import { StorageUrlHelper } from '../common/helpers/storage-url.helper';
+import { AppLoggerService } from '../common/loggers/app-logger.service';
 
 @Injectable()
 export class DestinationsService {
+  private readonly context = DestinationsService.name;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storages: StoragesService,
+    private readonly logger: AppLoggerService,
   ) {}
 
   // CREATE
@@ -33,6 +37,7 @@ export class DestinationsService {
     try {
       // Validate input
       if (!dto.name || dto.name.trim().length === 0) {
+        this.logger.warn('Nama destinasi tidak boleh kosong', this.context);
         throw new HttpException(
           'Nama destinasi tidak boleh kosong',
           HttpStatus.BAD_REQUEST,
@@ -44,6 +49,10 @@ export class DestinationsService {
       });
 
       if (exists) {
+        this.logger.warn(
+          `Nama destinasi sudah digunakan: ${dto.name}`,
+          this.context,
+        );
         throw new ConflictException({
           message: 'Validasi gagal',
           errors: { name: 'Nama destinasi sudah digunakan' },
@@ -53,10 +62,13 @@ export class DestinationsService {
       const created = await this.prisma.destination.create({
         data: { ...dto, name: dto.name.trim() },
       });
+      this.logger.log(
+        `Destinasi berhasil dibuat: ${created.name} (ID: ${created.id})`,
+        this.context,
+      );
 
-      const storageHelper = StorageUrlHelper.create(this.storages);
+      const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
       const withUrl = await storageHelper.buildFileUrls(created);
-
       return withUrl as unknown as responseCreateDestinationDto;
     } catch (error) {
       if (error instanceof HttpException) throw error;
@@ -72,6 +84,10 @@ export class DestinationsService {
   ): Promise<{ data: Destination[]; meta: any }> {
     try {
       const skip = (page - 1) * limit;
+      this.logger.debug(
+        `findAll called with search="${search}", page=${page}, limit=${limit}`,
+        this.context,
+      );
 
       const where: Prisma.DestinationWhereInput = search
         ? { name: { contains: search, mode: 'insensitive' } }
@@ -86,8 +102,12 @@ export class DestinationsService {
         }),
         this.prisma.destination.count({ where }),
       ]);
+      this.logger.debug(
+        `findAll result: ${data.length} destinations, total=${total}`,
+        this.context,
+      );
 
-      const storageHelper = StorageUrlHelper.create(this.storages);
+      const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
       const enriched = await storageHelper.buildFileUrlsForArray(data);
 
       return {
@@ -113,13 +133,15 @@ export class DestinationsService {
         where: { id },
       });
 
-      if (!destination)
+      if (!destination) {
+        this.logger.warn(`Destinasi tidak ditemukan (ID: ${id})`, this.context);
         throw new NotFoundException({
           message: 'Destinasi tidak ditemukan',
           errors: { id: `Tidak ada destinasi dengan ID ${id}` },
         });
+      }
 
-      const storageHelper = StorageUrlHelper.create(this.storages);
+      const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
       const withUrl = await storageHelper.buildFileUrls(destination);
       return withUrl as Destination;
     } catch (error) {
@@ -137,6 +159,10 @@ export class DestinationsService {
     try {
       // Validate input
       if (data.name && data.name.trim().length === 0) {
+        this.logger.warn(
+          'Nama destinasi tidak boleh kosong (update)',
+          this.context,
+        );
         throw new HttpException(
           'Nama destinasi tidak boleh kosong',
           HttpStatus.BAD_REQUEST,
@@ -146,21 +172,31 @@ export class DestinationsService {
       const existing = await this.prisma.destination.findUnique({
         where: { id },
       });
-      if (!existing)
+      if (!existing) {
+        this.logger.warn(
+          `Destinasi tidak ditemukan (update, ID: ${id})`,
+          this.context,
+        );
         throw new NotFoundException({
           message: 'Destinasi tidak ditemukan',
           errors: { id: `Tidak ada destinasi dengan ID ${id}` },
         });
+      }
 
       if (data.name && data.name.trim() !== existing.name) {
         const nameUsed = await this.prisma.destination.findFirst({
           where: { name: data.name.trim() },
         });
-        if (nameUsed)
+        if (nameUsed) {
+          this.logger.warn(
+            `Nama destinasi sudah digunakan (update): ${data.name}`,
+            this.context,
+          );
           throw new ConflictException({
             message: 'Validasi gagal',
             errors: { name: 'Nama destinasi sudah digunakan' },
           });
+        }
       }
 
       const updateData = { ...data };
@@ -172,11 +208,13 @@ export class DestinationsService {
         where: { id },
         data: updateData,
       });
+      this.logger.log(
+        `Destinasi berhasil diupdate: ${updated.name} (ID: ${updated.id})`,
+        this.context,
+      );
 
-      const storageHelper = StorageUrlHelper.create(this.storages);
-
+      const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
       const withUrl = await storageHelper.buildFileUrls(updated);
-
       return withUrl as unknown as responseUpdateDestinationDto;
     } catch (error) {
       if (error instanceof HttpException) throw error;
@@ -190,17 +228,27 @@ export class DestinationsService {
     file: Express.Multer.File,
   ): Promise<Destination> {
     try {
-      if (!file)
+      if (!file) {
+        this.logger.warn(
+          'File wajib diunggah pada updateImagePlace',
+          this.context,
+        );
         throw new HttpException('File wajib diunggah', HttpStatus.BAD_REQUEST);
+      }
 
       const existing = await this.prisma.destination.findUnique({
         where: { id },
       });
-      if (!existing)
+      if (!existing) {
+        this.logger.warn(
+          `Destinasi tidak ditemukan (updateImagePlace, ID: ${id})`,
+          this.context,
+        );
         throw new NotFoundException({
           message: 'Destinasi tidak ditemukan',
           errors: { id: `Tidak ada destinasi dengan ID ${id}` },
         });
+      }
 
       // Hapus file lama
       if (existing.image_place) {
@@ -208,20 +256,32 @@ export class DestinationsService {
           await this.storages.delete(existing.image_place, false);
         } catch (deleteError) {
           // Log error but continue with upload
-          console.error('Failed to delete old image:', deleteError);
+          this.logger.error(
+            `Failed to delete old image: ${(deleteError as Error)?.message}`,
+            (deleteError as Error)?.stack,
+            this.context,
+          );
         }
       }
 
       // Upload file baru
       const uploaded = await this.storages.upload(file, 'destinations', false);
+      this.logger.log(
+        `File baru diupload untuk destinasi ID: ${id}, file: ${uploaded.key}`,
+        this.context,
+      );
 
       // Update DB
       const updated = await this.prisma.destination.update({
         where: { id },
         data: { image_place: uploaded.key },
       });
+      this.logger.log(
+        `Destinasi diupdate dengan file baru: ${updated.name} (ID: ${updated.id})`,
+        this.context,
+      );
 
-      const storageHelper = StorageUrlHelper.create(this.storages);
+      const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
       const withUrl = await storageHelper.buildFileUrls(updated);
       return withUrl as Destination;
     } catch (error) {
@@ -236,22 +296,32 @@ export class DestinationsService {
       const exists = await this.prisma.destination.findUnique({
         where: { id },
       });
-      if (!exists)
+      if (!exists) {
+        this.logger.warn(
+          `Destinasi tidak ditemukan (remove, ID: ${id})`,
+          this.context,
+        );
         throw new NotFoundException({
           message: 'Destinasi tidak ditemukan',
           errors: { id: `Tidak ada destinasi dengan ID ${id}` },
         });
+      }
 
       if (exists.image_place) {
         try {
           await this.storages.delete(exists.image_place, false);
         } catch (deleteError) {
           // Log error but continue with deletion
-          console.error('Failed to delete image file:', deleteError);
+          this.logger.error(
+            `Failed to delete image file: ${(deleteError as Error)?.message}`,
+            (deleteError as Error)?.stack,
+            this.context,
+          );
         }
       }
 
       await this.prisma.destination.delete({ where: { id } });
+      this.logger.log(`Destinasi berhasil dihapus (ID: ${id})`, this.context);
       return { message: `Destinasi dengan ID ${id} berhasil dihapus` };
     } catch (error) {
       if (error instanceof HttpException) throw error;

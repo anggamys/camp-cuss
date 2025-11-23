@@ -7,7 +7,7 @@ import { WsException } from '@nestjs/websockets';
 
 @Injectable()
 export class DriverLocationsService {
-  private readonly context: string;
+  private readonly context = DriverLocationsService.name;
 
   constructor(
     private readonly prisma: PrismaService,

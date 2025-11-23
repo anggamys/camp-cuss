@@ -21,7 +21,7 @@ import { DriverLocationData } from '../common/types/driver.interface';
 
 @WebSocketGateway({ cors: true, namespace: '/driver-locations' })
 export class DriverLocationsGateway extends BaseGateway {
-  protected readonly context = 'DriverLocationsGateway';
+  protected readonly context = DriverLocationsGateway.name;
 
   constructor(
     private readonly jwt: JwtService,

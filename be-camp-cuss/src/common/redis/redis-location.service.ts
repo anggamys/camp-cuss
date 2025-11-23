@@ -8,7 +8,7 @@ import { RedisCacheKey, RedisChannel } from '../enums/redis.enum';
 
 @Injectable()
 export class RedisLocationService extends RedisBaseService {
-  protected readonly context = 'RedisLocationService';
+  protected readonly context = RedisLocationService.name;
   private readonly baseTTL = 60;
 
   constructor(@Inject(REDIS_CLIENT) redis: Redis, logger: AppLoggerService) {

@@ -5,17 +5,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { Socket } from 'socket.io';
 import {
   JsonWebTokenError,
   TokenExpiredError,
   NotBeforeError,
 } from 'jsonwebtoken';
-import { JwtEnvKeys } from '../../common/enums/env-keys.enum';
 import { UserPayload } from '../../common/types/user-context.interface';
 import { ApiResponse } from '../../common/types/api-response.interface';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
+import { Env } from '../../common/constants/env.constant';
 
 interface SocketWithUser extends Socket {
   user?: UserPayload;
@@ -31,11 +30,10 @@ interface JwtPayload {
 
 @Injectable()
 export class WsJwtGuard implements CanActivate {
-  private readonly context = 'WsJwtGuard';
+  private readonly context: string;
 
   constructor(
     private readonly jwt: JwtService,
-    private readonly config: ConfigService,
     private readonly logger: AppLoggerService,
   ) {}
 
@@ -55,11 +53,9 @@ export class WsJwtGuard implements CanActivate {
     }
 
     try {
-      const secret = this.config.getOrThrow<string>(
-        JwtEnvKeys.JWT_ACCESS_SECRET,
-      );
+      const accessSecret = Env.JWT_ACCESS_SECRET;
 
-      const decoded: unknown = this.jwt.verify(token, { secret });
+      const decoded: unknown = this.jwt.verify(token, { secret: accessSecret });
 
       if (!this.isValidJwtPayload(decoded)) {
         this.logger.warn(

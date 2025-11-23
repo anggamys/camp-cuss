@@ -1,11 +1,15 @@
-import { StoragesService } from '../../storages/storages.service';
 import { HttpException, HttpStatus } from '@nestjs/common';
+
+import { StoragesService } from '../../storages/storages.service';
+import { AppLoggerService } from '../loggers/app-logger.service';
 
 export interface EntityWithFiles {
   [key: string]: unknown;
 }
 
 export class StorageUrlHelper {
+  private readonly loggerContext = StorageUrlHelper.name;
+
   private readonly publicFields = ['photo_profile', 'image_place'];
   private readonly privateFields = [
     'photo_driving_license',
@@ -13,14 +17,25 @@ export class StorageUrlHelper {
     'photo_id_card',
   ];
 
-  constructor(private readonly storages: StoragesService) {}
+  constructor(
+    private readonly storages: StoragesService,
+    private readonly logger: AppLoggerService,
+  ) {}
 
-  static create(storages: StoragesService): StorageUrlHelper {
-    return new StorageUrlHelper(storages);
+  static create(
+    storages: StoragesService,
+    logger: AppLoggerService,
+  ): StorageUrlHelper {
+    return new StorageUrlHelper(storages, logger);
   }
 
   async buildFileUrls(entity: EntityWithFiles): Promise<EntityWithFiles> {
     if (!entity || typeof entity !== 'object') {
+      this.logger.error(
+        'Entity harus berupa object pada buildFileUrls',
+        undefined,
+        this.loggerContext,
+      );
       throw new HttpException(
         'Entity harus berupa object',
         HttpStatus.BAD_REQUEST,
@@ -39,7 +54,12 @@ export class StorageUrlHelper {
         } else if (this.isPrivateField(field)) {
           result[field] = await this.storages.createSignedUrl(value);
         }
-      } catch {
+      } catch (err) {
+        this.logger.error(
+          `Gagal membangun URL untuk field ${field}: ${(err as Error)?.message}`,
+          (err as Error)?.stack,
+          this.loggerContext,
+        );
         throw new HttpException(
           `Gagal membangun URL untuk field ${field}`,
           HttpStatus.INTERNAL_SERVER_ERROR,
@@ -54,6 +74,11 @@ export class StorageUrlHelper {
     entities: EntityWithFiles[],
   ): Promise<EntityWithFiles[]> {
     if (!Array.isArray(entities)) {
+      this.logger.error(
+        'Entities harus berupa array pada buildFileUrlsForArray',
+        undefined,
+        this.loggerContext,
+      );
       throw new HttpException(
         'Entities harus berupa array',
         HttpStatus.BAD_REQUEST,

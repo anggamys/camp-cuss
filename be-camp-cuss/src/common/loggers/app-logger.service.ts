@@ -6,6 +6,7 @@ import {
   Logger as WinstonLogger,
 } from 'winston';
 import { RequestContextService } from '../contexts/request-context.service';
+import { Env } from '../constants/env.constant';
 
 @Injectable()
 export class AppLoggerService implements LoggerService {
@@ -39,7 +40,7 @@ export class AppLoggerService implements LoggerService {
             }),
           ),
         }),
-        ...(process.env.LOG_TO_FILE === 'true'
+        ...(Env.LOG_TO_FILE === 'true'
           ? [
               new transports.File({
                 filename: 'logs/app.log',

@@ -16,9 +16,9 @@ export class OrdersCoreService {
   private readonly context = OrdersCoreService.name;
 
   constructor(
-    private readonly logger: AppLoggerService,
     private readonly prisma: PrismaService,
     private readonly broadcast: OrdersBroadcastService,
+    private readonly logger: AppLoggerService,
   ) {}
 
   async create(
@@ -52,7 +52,6 @@ export class OrdersCoreService {
 
       this.logger.log(
         `Pesanan #${order.id} berhasil dibuat oleh user ${customerId}`,
-        this.context,
       );
 
       if (order.status === OrderStatus.pending) {

@@ -13,7 +13,7 @@ import { DriverLocationData } from '../common/types/driver.interface';
 
 @Controller()
 export class DriverLocationsListener implements OnModuleInit, OnModuleDestroy {
-  private readonly context = 'DriverLocationsListener';
+  private readonly context = DriverLocationsListener.name;
   private isSubscribed = false;
 
   constructor(

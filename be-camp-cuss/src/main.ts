@@ -6,17 +6,16 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ValidationError } from 'class-validator';
-import { ConfigService } from '@nestjs/config';
 
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { UserContextInterceptor } from './common/interceptors/user-context.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { RequestContextService } from './common/contexts/request-context.service';
 import { AppLoggerService } from './common/loggers/app-logger.service';
+import { Env } from './common/constants/env.constant';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });
-  const config = app.get(ConfigService);
   const logger = app.get(AppLoggerService);
 
   // Prefix dan versi API
@@ -53,12 +52,12 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: config.get<string>('FRONTEND_URL') ?? '*',
+    origin: Env.CORS_ORIGINS.length > 0 ? Env.CORS_ORIGINS : '*',
     credentials: true,
   });
 
   // Jalankan HTTP server
-  const port = config.get<number>('PORT') ?? 3000;
+  const port = Env.PORT;
   await app.listen(port);
   logger.log(`Server berjalan di port ${port}`, 'Bootstrap');
 }

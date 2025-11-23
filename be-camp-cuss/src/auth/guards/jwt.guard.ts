@@ -24,7 +24,7 @@ interface RequestWithHeaders {
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  private readonly context = 'JwtAuthGuard';
+  private readonly context: string;
 
   constructor(
     private readonly reflector: Reflector,

@@ -5,7 +5,7 @@ import { AppLoggerService } from '../loggers/app-logger.service';
 
 @Injectable()
 export class RedisBaseService {
-  protected readonly context: string;
+  protected readonly context = RedisBaseService.name;
 
   constructor(
     @Inject(REDIS_CLIENT) protected readonly redis: Redis,

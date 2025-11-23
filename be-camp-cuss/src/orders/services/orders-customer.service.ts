@@ -6,6 +6,8 @@ import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 @Injectable()
 export class OrdersCustomerService {
+  private readonly context = OrdersCustomerService.name;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: AppLoggerService,
@@ -49,7 +51,10 @@ export class OrdersCustomerService {
         data: { status: OrderStatus.cancelled, driver_id: null },
       });
 
-      this.logger.warn(`Pesanan ${orderId} dibatalkan oleh user ${userId}`);
+      this.logger.warn(
+        `Pesanan ${orderId} dibatalkan oleh user ${userId}`,
+        this.context,
+      );
       return updated;
     } catch (e) {
       if (e instanceof HttpException) throw e;

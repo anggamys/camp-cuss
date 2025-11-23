@@ -22,7 +22,7 @@ interface AuthenticatedSocket extends Socket {
 
 @Injectable()
 export class WsAuthMiddleware {
-  private readonly context = 'WsAuthMiddleware';
+  private readonly context = WsAuthMiddleware.name;
 
   constructor(
     private readonly jwt: JwtService,

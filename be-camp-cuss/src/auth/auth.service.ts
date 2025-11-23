@@ -1,8 +1,8 @@
-// src/auth/auth.service.ts
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+
 import { PrismaService } from '../prisma/prisma.services';
 import {
   loginDto,
@@ -19,6 +19,8 @@ import { TokenStoreHelper } from '../common/helpers/token-store.helper';
 
 @Injectable()
 export class AuthService {
+  private readonly context = AuthService.name;
+
   constructor(
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
@@ -38,13 +40,15 @@ export class AuthService {
       data: { ...dto, password: hashed },
       select: { id: true, email: true, username: true },
     });
-    this.logger.log(`User registered id=${user.id}`);
+
+    this.logger.log(`User registered id=${user.id}`, this.context);
     return user;
   }
 
   async login(dto: loginDto): Promise<responseLoginDto> {
     const { username, password } = dto;
-    this.logger.log(`Login attempt: ${username}`);
+
+    this.logger.log(`Login attempt: ${username}`, this.context);
 
     const user = await this.prisma.user.findUnique({ where: { username } });
     if (!user)
@@ -66,12 +70,13 @@ export class AuthService {
     );
 
     const hashedRefresh = await PasswordHelper.hash(refresh);
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: { refresh_token: hashedRefresh },
     });
 
-    this.logger.log(`Login success: userId=${user.id}`);
+    this.logger.log(`Login success: userId=${user.id}`, this.context);
     return { access_token: access, refresh_token: refresh };
   }
 
@@ -103,7 +108,7 @@ export class AuthService {
       user,
     );
 
-    this.logger.log(`Token refreshed for userId=${user.id}`);
+    this.logger.log(`Token refreshed for userId=${user.id}`, this.context);
     return { access_token: newAccess };
   }
 
@@ -114,10 +119,9 @@ export class AuthService {
     });
 
     if (accessToken) this.tokenStore.add(accessToken);
-    this.logger.log(`User logout success: id=${userId}`);
+    this.logger.log(`User logout success: id=${userId}`, this.context);
   }
 
-  /** Mengecek token di blacklist */
   isTokenBlacklisted(token: string): boolean {
     return this.tokenStore.has(token);
   }

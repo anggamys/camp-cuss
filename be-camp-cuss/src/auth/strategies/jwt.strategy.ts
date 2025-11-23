@@ -1,24 +1,18 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.services';
 import {
   JwtPayload,
   UserPayload,
 } from '../../common/types/user-context.interface';
-import { JwtEnvKeys } from '../../common/enums/env-keys.enum';
 import { ApiResponse } from '../../common/types/api-response.interface';
+import { Env } from '../../common/constants/env.constant';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {
-    const jwtSecret = config.get<string>(JwtEnvKeys.JWT_ACCESS_SECRET, {
-      infer: true,
-    });
+  constructor(private readonly prisma: PrismaService) {
+    const jwtSecret = Env.JWT_ACCESS_SECRET;
 
     if (!jwtSecret) {
       throw new Error('JWT_ACCESS_SECRET belum diatur di file .env');

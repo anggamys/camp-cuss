@@ -6,7 +6,7 @@ import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 @Injectable()
 export class OrdersDriverService {
-  private readonly context = 'OrdersDriverService';
+  private readonly context = OrdersDriverService.name;
 
   constructor(
     private readonly prisma: PrismaService,

@@ -11,10 +11,16 @@ import {
   ResponseApproveDriverRequestDto,
 } from '../dto/approve-driver-request.dto';
 import { DriverRequestItemDto } from '../dto/list-driver-requests.dto';
+import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 @Injectable()
 export class UsersApprovalService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly context = UsersApprovalService.name;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: AppLoggerService,
+  ) {}
 
   async requestDriver(
     user_id: number,
@@ -24,17 +30,27 @@ export class UsersApprovalService {
       const user = await this.prisma.user.findUnique({
         where: { id: user_id },
       });
-      if (!user)
+      if (!user) {
+        this.logger.warn(
+          `User not found for requestDriver (user_id: ${user_id})`,
+          this.context,
+        );
         throw new HttpException(
           'Pengguna tidak ditemukan',
           HttpStatus.NOT_FOUND,
         );
+      }
 
-      if (user.role === UserRole.driver)
+      if (user.role === UserRole.driver) {
+        this.logger.warn(
+          `User already a driver (user_id: ${user_id})`,
+          this.context,
+        );
         throw new HttpException(
           'Anda sudah menjadi driver',
           HttpStatus.BAD_REQUEST,
         );
+      }
 
       // Validasi kelengkapan data penting
       const required = [
@@ -43,11 +59,16 @@ export class UsersApprovalService {
         user.photo_student_card,
         user.photo_driving_license,
       ];
-      if (required.some((x) => !x))
+      if (required.some((x) => !x)) {
+        this.logger.warn(
+          `Incomplete documents for driver request (user_id: ${user_id})`,
+          this.context,
+        );
         throw new HttpException(
           'Lengkapi seluruh dokumen sebelum mengajukan permintaan driver',
           HttpStatus.BAD_REQUEST,
         );
+      }
 
       // Cek existing request aktif
       const activeRequest = await this.prisma.driverRequest.findFirst({
@@ -62,6 +83,10 @@ export class UsersApprovalService {
           activeRequest.status === ApprovalStatus.pending
             ? 'Permintaan Anda masih menunggu persetujuan'
             : 'Anda sudah terdaftar sebagai driver';
+        this.logger.warn(
+          `Active driver request exists (user_id: ${user_id}, status: ${activeRequest.status})`,
+          this.context,
+        );
         throw new HttpException(message, HttpStatus.BAD_REQUEST);
       }
 
@@ -77,8 +102,16 @@ export class UsersApprovalService {
         },
       });
 
+      this.logger.log(
+        `Driver request created (user_id: ${user_id}, request_id: ${createdRequest.id})`,
+        this.context,
+      );
       return createdRequest;
     } catch (error) {
+      this.logger.error(
+        `Error in requestDriver (user_id: ${user_id}): ${error instanceof Error ? error.message : error}`,
+        this.context,
+      );
       if (error instanceof HttpException) throw error;
       PrismaErrorHelper.handle(error);
     }
@@ -102,9 +135,14 @@ export class UsersApprovalService {
       });
 
       if (requests.length === 0) {
+        this.logger.debug('No pending driver requests found', this.context);
         return [];
       }
 
+      this.logger.debug(
+        `Found ${requests.length} pending driver requests`,
+        this.context,
+      );
       return requests.map((request) => ({
         id: request.id,
         status: request.status,
@@ -120,6 +158,10 @@ export class UsersApprovalService {
         },
       }));
     } catch (error) {
+      this.logger.error(
+        `Error in listRequests: ${error instanceof Error ? error.message : error}`,
+        this.context,
+      );
       PrismaErrorHelper.handle(error);
     }
   }
@@ -137,20 +179,30 @@ export class UsersApprovalService {
         include: { user: true },
       });
 
-      if (!request)
+      if (!request) {
+        this.logger.warn(
+          `Driver request not found (request_id: ${request_id})`,
+          this.context,
+        );
         throw new HttpException(
           'Permintaan tidak ditemukan',
           HttpStatus.NOT_FOUND,
         );
+      }
 
       if (
         request.status !== ApprovalStatus.pending ||
         request.approved_by !== null
-      )
+      ) {
+        this.logger.warn(
+          `Driver request already processed (request_id: ${request_id}, status: ${request.status})`,
+          this.context,
+        );
         throw new HttpException(
           'Permintaan ini sudah diproses',
           HttpStatus.CONFLICT,
         );
+      }
 
       const newStatus = approved
         ? ApprovalStatus.approved
@@ -182,6 +234,10 @@ export class UsersApprovalService {
         }
       });
 
+      this.logger.log(
+        `Driver request ${newStatus} (request_id: ${request_id}, admin_id: ${admin_id})`,
+        this.context,
+      );
       return {
         id: request.id,
         status: newStatus,
@@ -191,6 +247,10 @@ export class UsersApprovalService {
         approved_by: admin_id,
       };
     } catch (error) {
+      this.logger.error(
+        `Error in approveRequest (request_id: ${request_id}, admin_id: ${admin_id}): ${error instanceof Error ? error.message : error}`,
+        this.context,
+      );
       if (error instanceof HttpException) throw error;
       PrismaErrorHelper.handle(error);
     }

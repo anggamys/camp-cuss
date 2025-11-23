@@ -1,16 +1,17 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
 import { OrdersNotificationsGateway } from '../../orders-notifications/orders-notifications.gateway';
 import { Order, OrderStatus } from '@prisma/client';
+import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 @Injectable()
 export class OrdersBroadcastService implements OnModuleInit {
-  private readonly logger = new Logger(OrdersBroadcastService.name);
   private readonly activeIntervals = new Map<number, NodeJS.Timeout>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly gateway: OrdersNotificationsGateway,
+    private readonly logger: AppLoggerService,
   ) {}
 
   async onModuleInit(): Promise<void> {

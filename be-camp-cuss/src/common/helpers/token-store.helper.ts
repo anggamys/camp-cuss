@@ -5,6 +5,7 @@ import { AppLoggerService } from '../loggers/app-logger.service';
 
 @Injectable()
 export class TokenStoreHelper {
+  private readonly loggerContext = TokenStoreHelper.name;
   private blacklist = new Set<string>();
 
   constructor(
@@ -12,7 +13,6 @@ export class TokenStoreHelper {
     private readonly logger: AppLoggerService,
   ) {}
 
-  /** Tambah token ke blacklist */
   add(token: string): void {
     const decoded: unknown = this.jwt.decode(token);
     const exp = this.isDecodedWithExp(decoded) ? decoded.exp : 0;
@@ -20,17 +20,19 @@ export class TokenStoreHelper {
 
     if (ttl > 0) {
       this.blacklist.add(token);
-      this.logger.debug(`Token blacklisted; TTL=${ttl}s`);
+      this.logger.debug(`Token blacklisted; TTL=${ttl}s`, this.loggerContext);
 
       setTimeout(() => {
         this.blacklist.delete(token);
       }, ttl * 1000);
     } else {
-      this.logger.debug('Token sudah expired; tidak dimasukkan blacklist');
+      this.logger.debug(
+        'Token sudah expired; tidak dimasukkan blacklist',
+        this.loggerContext,
+      );
     }
   }
 
-  /** Type guard untuk decoded token dengan exp */
   private isDecodedWithExp(decoded: unknown): decoded is { exp: number } {
     return (
       decoded !== null &&
@@ -40,13 +42,14 @@ export class TokenStoreHelper {
     );
   }
 
-  /** Cek apakah token di blacklist */
   has(token: string): boolean {
     return this.blacklist.has(token);
   }
 
-  /** Bersihkan token expired (noop utk in-memory) */
   cleanup(): void {
-    this.logger.debug('Token cleanup scheduled (noop in-memory)');
+    this.logger.debug(
+      'Token cleanup scheduled (noop in-memory)',
+      this.loggerContext,
+    );
   }
 }

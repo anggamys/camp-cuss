@@ -6,7 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { JwtEnvKeys } from '../common/enums/env-keys.enum';
+import { Env } from '../common/constants/env.constant';
 
 @Global()
 @Module({
@@ -17,24 +17,13 @@ import { JwtEnvKeys } from '../common/enums/env-keys.enum';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService): JwtModuleOptions => {
-        const secret = config.get<string>(JwtEnvKeys.JWT_ACCESS_SECRET);
-        const expiresRaw = config.get<string>(JwtEnvKeys.JWT_ACCESS_EXPIRES);
-        const expiresIn = Number(expiresRaw);
-
-        if (!secret) {
-          throw new Error('Missing environment variable: JWT_ACCESS_SECRET');
-        }
-
-        if (Number.isNaN(expiresIn) || expiresIn <= 0) {
-          throw new Error(
-            `Invalid value for JWT_ACCESS_EXPIRES: "${expiresRaw}" — must be a positive number in seconds.`,
-          );
-        }
+      useFactory: (): JwtModuleOptions => {
+        const accessSecret = Env.JWT_ACCESS_SECRET;
+        const exprireAccessIn = Number(Env.JWT_ACCESS_EXPIRES);
 
         return {
-          secret,
-          signOptions: { expiresIn },
+          secret: accessSecret,
+          signOptions: { expiresIn: exprireAccessIn },
         };
       },
     }),
