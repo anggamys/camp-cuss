@@ -5,6 +5,11 @@ export const updateProfile = async (userId, data) => {
   return res.data.data;
 };
 
+export const getByIdUser = async userId => {
+  const res = await api.get(`/users/${userId}`);
+  return res.data.data;
+};
+
 export const uploadProfilePhoto = async (
   userId,
   uri,

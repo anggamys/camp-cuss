@@ -43,7 +43,7 @@ const HomeUser = () => {
       if (order.status === 'pending') {
         navigation.navigate('SearchingDriver', {order});
       } else if (order.status === 'accepted') {
-        navigation.navigate('OrderingScreen', {order});
+        navigation.navigate('OrderingUser', {order});
       } else if (['paid', 'completed'].includes(order.status)) {
         navigation.navigate('OrderDetail', {order});
       }

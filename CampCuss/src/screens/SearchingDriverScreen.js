@@ -46,7 +46,7 @@ const SearchingDriverScreen = ({route}) => {
     } finally {
       setIsCancelling(false);
     }
-  }, [order.id, cancelOrder, isCancelling, goToHome]); // ✅ goToHome sekarang stabil
+  }, [order.id, cancelOrder, isCancelling, goToHome]);
 
   useEffect(() => {
     if (!order?.id || order.status !== 'pending') {
@@ -56,7 +56,7 @@ const SearchingDriverScreen = ({route}) => {
 
     const handleStatusUpdate = data => {
       if (data.status === 'accepted') {
-        navigation.replace('OrderingScreen', {order: data});
+        navigation.replace('OrderingUser', {order: data});
       } else if (data.status === 'cancelled') {
         goToHome();
       }

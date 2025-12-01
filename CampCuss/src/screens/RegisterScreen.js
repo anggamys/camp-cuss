@@ -1,6 +1,6 @@
 // screens/RegisterScreen.js
 
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -12,14 +12,14 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../hooks/useAuth';
-import { useNavigation } from '@react-navigation/native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {useAuth} from '../hooks/useAuth';
+import {useNavigation} from '@react-navigation/native';
 import FloatingInput from '../components/FloatingInput';
 
 export default function RegisterScreen() {
   const navigation = useNavigation();
-  const { register, error, setError } = useAuth();
+  const {register, error, setError} = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,14 +41,14 @@ export default function RegisterScreen() {
     }
 
     if (confirmPassword !== password) {
-      return setError('Konfirmasi password salah.')
+      return setError('Konfirmasi password salah.');
     }
 
     setLoading(true);
     try {
       await register(username, email, password, npm, noPhone);
       Alert.alert('Berhasil!', 'Akun berhasil dibuat.', [
-        { text: 'OK', onPress: () => navigation.navigate('Login') },
+        {text: 'OK', onPress: () => navigation.navigate('Login')},
       ]);
     } finally {
       setLoading(false);
@@ -64,12 +64,10 @@ export default function RegisterScreen() {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-      >
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
         <ScrollView
           contentContainerStyle={styles.scrollViewContent}
-          showsVerticalScrollIndicator={false}
-        >
+          showsVerticalScrollIndicator={false}>
           <View style={styles.innerContainer}>
             <Image
               source={require('../assets/logo-name.png')}
@@ -125,8 +123,7 @@ export default function RegisterScreen() {
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleRegister}
-              disabled={loading}
-            >
+              disabled={loading}>
               <Text style={styles.btnText}>
                 {loading ? 'Mendaftar...' : 'Daftar'}
               </Text>

@@ -15,8 +15,12 @@ import BottomNav from '../components/BottomNav';
 import IconBell from 'react-native-vector-icons/MaterialCommunityIcons';
 import Icons from 'react-native-vector-icons/Ionicons';
 import IconUsers from 'react-native-vector-icons/FontAwesome';
-import IconMotorcycle from 'react-native-vector-icons/MaterialIcons';
+import IconMotorcycle from 'react-native-vector-icons/Fontisto';
+import IconWA from 'react-native-vector-icons/Fontisto';
+import IconPhone from 'react-native-vector-icons/Fontisto';
 import {useNavigation} from '@react-navigation/native';
+import {useDestinationById} from '../hooks/useDestinationById';
+import {useUserById} from '../hooks/useUserById';
 
 export default function HomeDriver() {
   const {profile} = useAuth();
@@ -27,6 +31,16 @@ export default function HomeDriver() {
 
   const {activeOrder, loadingAccept, acceptOrder, rejectOrder, acceptedOrder} =
     useDriverOrders(isDriverActive);
+
+  const {destination} = useDestinationById(acceptedOrder?.destination_id);
+
+  const {user} = useUserById(acceptedOrder?.user_id);
+
+  // console.log(acceptedOrder?.user_id);
+
+  // console.log(acceptedOrder);
+
+  // console.log(user);
 
   // Fungsi untuk navigasi ke OrderingDriver dengan useCallback
   const navigateToOrderScreen = useCallback(
@@ -43,25 +57,11 @@ export default function HomeDriver() {
     const accepted = await acceptOrder();
 
     if (accepted) {
-      // Tidak perlu navigate di sini karena useEffect akan menangani
-      console.log('Order accepted, waiting for navigation...');
+       navigation.navigate('OrderingDriver', {accepted});
     }
   };
 
   const handleReject = () => rejectOrder();
-
-  // Fungsi untuk mendapatkan teks status order dengan useCallback
-  const getOrderStatusText = useCallback(status => {
-    const statusMap = {
-      pending: 'Menunggu Konfirmasi',
-      accepted: 'Pesanan Diterima',
-      on_the_way: 'Dalam Perjalanan',
-      picked_up: 'Penumpang Diambil',
-      completed: 'Selesai',
-      cancelled: 'Dibatalkan',
-    };
-    return statusMap[status] || status;
-  }, []);
 
   return (
     <>
@@ -115,26 +115,48 @@ export default function HomeDriver() {
           </View>
         </View>
 
-        {/* Banner untuk pesanan yang sudah diterima */}
         {acceptedOrder && (
-          <TouchableOpacity
-            style={styles.activeOrderBanner}
-            onPress={handleOrder}>
-            <View style={styles.orderInfo}>
-              <Text style={styles.orderStatus}>
-                {acceptedOrder.status === 'pending'
-                  ? 'Pesanan Tertunda'
-                  : 'Pesanan Aktif'}
+          <>
+            <View style={styles.statusBar}>
+              <Text style={styles.textBar}>
+                Transaksi Yang sedang berlangsung
               </Text>
-              <View style={styles.wrapper}>
-                <IconMotorcycle name="motorcycle" size={40} color="#4E1F1A" />
-                <Text style={styles.orderDetail}>
-                  {getOrderStatusText(acceptedOrder.status)}
-                </Text>
-              </View>
             </View>
-            <Icons name="chevron-forward" size={24} color="#FCEBD7" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.activeOrderBanner}
+              onPress={handleOrder}>
+              <View style={styles.orderInfo}>
+                <Text style={styles.orderStatus}>
+                  Pesanan menuju {destination?.name}
+                </Text>
+                <View style={styles.wrapper}>
+                  <IconMotorcycle name="motorcycle" size={75} color="#4E1F1A" />
+                  <View>
+                    <Text style={styles.orderTitle}>
+                      Kamu segera tiba dalam {destination?.estimated} menit
+                    </Text>
+                    <View style={styles.wrapperSpan}>
+                      <Text style={styles.orderSpan}>
+                        Atas nama {'\n'}{user?.username}
+                      </Text>
+                        <IconWA
+                          name="whatsapp"
+                          size={20}
+                          color="#FCEBD7"
+                          style={styles.iconCall}
+                        />
+                        <IconPhone
+                          name="phone"
+                          size={20}
+                          color="#FCEBD7"
+                          style={styles.iconCall}
+                        />
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </>
         )}
 
         {/* Card untuk pesanan baru */}
@@ -242,9 +264,10 @@ const styles = StyleSheet.create({
   textInput: {flex: 1, fontSize: 16, color: '#4E1F1A', padding: 0},
   // Banner untuk pesanan aktif
   activeOrderBanner: {
-    backgroundColor: '#4E1F1A',
+    backgroundColor: '#F3EDEA',
     marginHorizontal: 30,
-    padding: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
     borderRadius: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -257,13 +280,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   orderStatus: {
-    color: '#FCEBD7',
+    color: '#4E1F1A',
     fontSize: 16,
-    fontWeight: 'bold',
     marginBottom: 10,
   },
   orderDetail: {
-    color: '#FCEBD7',
+    color: '#4E1F1A',
     fontSize: 14,
     marginLeft: 10,
   },
@@ -301,12 +323,27 @@ const styles = StyleSheet.create({
     color: '#501D1C',
     marginBottom: 12,
   },
+  orderSpan: {
+    fontSize: 16,
+    color: '#501D1C',
+  },
   wrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 30,
     marginBottom: 16,
+  },
+  wrapperSpan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  iconCall: {
+    backgroundColor: '#501D1C',
+    padding: 3,
+    borderWidth: 5,
+    borderRadius: 100,
   },
   titleOrder: {fontSize: 16, color: '#501D1C', marginBottom: 6},
   orderLocation: {

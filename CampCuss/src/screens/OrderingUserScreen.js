@@ -1,352 +1,544 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
-  ScrollView,
-  StatusBar,
-  Alert,
   Dimensions,
-  Modal,
+  Alert,
+  Animated,
+  PanResponder,
+  Image,
 } from 'react-native';
 import MapView, {Marker, Polyline} from 'react-native-maps';
+
+// Icons
 import Icons from 'react-native-vector-icons/MaterialIcons';
+import IconWA from 'react-native-vector-icons/Fontisto';
+import IconPhone from 'react-native-vector-icons/Fontisto';
 
-const {width, height} = Dimensions.get('window');
-const ASPECT_RATIO = width / height;
-const LATITUDE_DELTA = 0.02;
-const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
+// Hooks
+import {useSocketCustomer} from '../hooks/useSocketCustomer';
+import {useDestinationById} from '../hooks/useDestinationById';
+import {useUserById} from '../hooks/useUserById';
+import FloatingInput from '../components/FloatingInput';
 
-const OrderingUserScreen = ({route, navigation}) => {
-  const {order} = route.params;
+const {width, height: SCREEN_HEIGHT} = Dimensions.get('window');
+const MODAL_MIN_HEIGHT = SCREEN_HEIGHT * 0.3;
 
-  const [driverLocation, setDriverLocation] = useState({
-    latitude: -7.2575,
-    longitude: 112.7521,
-  });
-  const [userLocation, setUserLocation] = useState({
-    latitude: -7.25,
-    longitude: 112.76,
-  });
-  const [destinationLocation, setDestinationLocation] = useState({
-    latitude: -7.245,
-    longitude: 112.77,
-  });
+const OrderingUserScreen = ({route: navigationRoute}) => {
+  const {order} = navigationRoute.params;
+  const {destination} = useDestinationById(order?.id);
+  const {user} = useUserById(order?.driver_id);
 
-  const [isDriverModalVisible, setIsDriverModalVisible] = useState(false);
+  // Socket hook untuk tracking user
+  const {isConnected, isConnecting, driverLocation, reconnectSocket} =
+    useSocketCustomer(order?.id);
+
+  // Modal animation state
+  const [modalY] = useState(new Animated.Value(SCREEN_HEIGHT * 0.8));
+  const [isModalVisible, setIsModalVisible] = useState(true);
+  const [mapPadding, setMapPadding] = useState({bottom: SCREEN_HEIGHT * 0.2});
+
+  // Lokasi user (pickup) dan destination
+  const userLocation = useMemo(
+    () => ({
+      latitude: order?.pick_up_latitude || -7.321656,
+      longitude: order?.pick_up_longitude || 112.796317,
+    }),
+    [order],
+  );
+
+  const destinationLocation = useMemo(() => {
+    return {
+      latitude: -7.332303,
+      longitude: 112.788273,
+    };
+  }, []);
+
+  const [driverToUserRoute, setDriverToUserRoute] = useState([]);
+  const [userToDestinationRoute, setUserToDestinationRoute] = useState([]);
 
   const mapRef = useRef(null);
 
-  // Simulasi gerak driver
+  // Modal animation functions
+  const openModalFull = useCallback(() => {
+    setIsModalVisible(true);
+    setMapPadding({bottom: SCREEN_HEIGHT * 0.3});
+    Animated.spring(modalY, {
+      toValue: MODAL_MIN_HEIGHT,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 10,
+    }).start();
+  }, [modalY]);
+
+  const openModalPartial = useCallback(() => {
+    setIsModalVisible(true);
+    setMapPadding({bottom: SCREEN_HEIGHT * 0.2});
+    Animated.spring(modalY, {
+      toValue: SCREEN_HEIGHT * 0.8,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 10,
+    }).start();
+  }, [modalY]);
+
+  // Set posisi awal saat komponen pertama render
   useEffect(() => {
-    const interval = setInterval(() => {
-      setDriverLocation(prev => ({
-        ...prev,
-        latitude: prev.latitude + 0.0002,
-        longitude: prev.longitude - 0.0001,
-      }));
-    }, 3000);
-    return () => clearInterval(interval);
+    openModalPartial();
+  }, [openModalPartial]);
+
+  // Helper function untuk Haversine distance
+  const calculateHaversineDistance = useCallback((coord1, coord2) => {
+    const toRad = x => (x * Math.PI) / 180;
+    const R = 6371;
+
+    const dLat = toRad(coord2.latitude - coord1.latitude);
+    const dLon = toRad(coord2.longitude - coord1.longitude);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(coord1.latitude)) *
+        Math.cos(toRad(coord2.latitude)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   }, []);
 
-  const fitMapToMarkers = () => {
-    if (mapRef.current) {
-      const locations = [driverLocation, userLocation, destinationLocation];
-      const latitudes = locations.map(loc => loc.latitude);
-      const longitudes = locations.map(loc => loc.longitude);
+  // Helper function untuk menghitung distance route OSRM
+  const calculateRouteDistance = useCallback(
+    routeCoordinates => {
+      if (routeCoordinates.length < 2) {
+        return 0;
+      }
 
-      const minLat = Math.min(...latitudes);
-      const maxLat = Math.max(...latitudes);
-      const minLng = Math.min(...longitudes);
-      const maxLng = Math.max(...longitudes);
+      let totalDistance = 0;
+      for (let i = 1; i < routeCoordinates.length; i++) {
+        totalDistance += calculateHaversineDistance(
+          routeCoordinates[i - 1],
+          routeCoordinates[i],
+        );
+      }
+      return totalDistance;
+    },
+    [calculateHaversineDistance],
+  );
 
-      const centerLat = (minLat + maxLat) / 2;
-      const centerLng = (minLng + maxLng) / 2;
-      const latDelta = maxLat - minLat + 0.005;
-      const lngDelta = maxLng - minLng + 0.005;
+  // Fetch routes function dengan OSRM
+  const fetchRouteFromOSRM = useCallback(async (startCoords, endCoords) => {
+    try {
+      const {latitude: startLat, longitude: startLng} = startCoords;
+      const {latitude: endLat, longitude: endLng} = endCoords;
 
-      mapRef.current.animateToRegion({
-        latitude: centerLat,
-        longitude: centerLng,
-        latitudeDelta: latDelta > 0.01 ? latDelta : 0.01,
-        longitudeDelta: lngDelta > 0.01 ? lngDelta : 0.01,
-      });
+      const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.code === 'Ok' && data.routes?.[0]) {
+        const routeCoordinates = data.routes[0].geometry.coordinates.map(
+          coord => ({
+            latitude: coord[1],
+            longitude: coord[0],
+          }),
+        );
+        return routeCoordinates;
+      } else {
+        return [startCoords, endCoords];
+      }
+    } catch (error) {
+      console.log('❌ Error fetching OSRM route:', error);
+      return [startCoords, endCoords];
     }
-  };
+  }, []);
 
+  // Load routes ketika user location atau locations berubah
   useEffect(() => {
-    fitMapToMarkers();
-  }, [driverLocation]);
+    const loadRoutes = async () => {
+      if (!userLocation.latitude || !destinationLocation.latitude) {
+        return;
+      }
 
-  const driverInfo = {
-    name: 'Jing Sabin',
-    rating: 4.8,
-    vehicle: 'Yen VIP - Ban Mulla 2',
-    plateNumber: 'L 1234 XYZ',
-    phone: '+62 812-3456-7890',
-    avatar: 'https://via.placeholder.com/80',
-    eta: '36 min',
-    distance: '18 km',
-  };
+      try {
+        const userToDestination = await fetchRouteFromOSRM(
+          userLocation,
+          destinationLocation,
+        );
+        setUserToDestinationRoute(userToDestination);
 
-  const handleCallDriver = () => {
-    console.log('Memanggil driver:', driverInfo.phone);
-  };
+        if (driverLocation?.latitude) {
+          const driverToUser = await fetchRouteFromOSRM(
+            driverLocation,
+            userLocation,
+          );
+          setDriverToUserRoute(driverToUser);
+        } else {
+          setDriverToUserRoute([]);
+        }
+      } catch (error) {
+        console.log('❌ Error loading OSRM routes:', error);
+      }
+    };
 
-  const handleMessageDriver = () => {
-    console.log('Mengirim pesan ke driver:', driverInfo.phone);
-  };
+    loadRoutes();
+  }, [driverLocation, userLocation, destinationLocation, fetchRouteFromOSRM]);
 
-  const handleCancelOrder = () => {
-    Alert.alert(
-      'Batalkan Order',
-      'Apakah Anda yakin ingin membatalkan order?',
-      [
-        {text: 'Tidak', style: 'cancel'},
-        {
-          text: 'Ya, Batalkan',
-          style: 'destructive',
-          onPress: () => navigation.goBack(),
-        },
-      ],
-    );
-  };
+  // Fit map untuk menampilkan semua marker dan rute
+  useEffect(() => {
+    if (mapRef.current) {
+      const coordinates = [userLocation, destinationLocation];
 
-  const openDriverModal = () => setIsDriverModalVisible(true);
-  const closeDriverModal = () => setIsDriverModalVisible(false);
+      if (driverLocation?.latitude) {
+        coordinates.push(driverLocation);
+      }
 
-  const polylineCoordinates = [
+      // Tambahkan semua koordinat rute untuk fitToCoordinates
+      const allCoordinates = [
+        ...coordinates,
+        ...driverToUserRoute,
+        ...userToDestinationRoute,
+      ];
+
+      setTimeout(() => {
+        mapRef.current?.fitToCoordinates(
+          allCoordinates.length > 0 ? allCoordinates : coordinates,
+          {
+            edgePadding: {
+              top: 100,
+              right: 50,
+              bottom: 80,
+              left: 50,
+            },
+            animated: true,
+          },
+        );
+      }, 1000);
+    }
+  }, [
     driverLocation,
     userLocation,
     destinationLocation,
-  ];
+    driverToUserRoute,
+    userToDestinationRoute,
+    mapPadding.bottom,
+  ]);
+
+  // Calculate real-time info - Driver ke User
+  const driverToUserInfo = useMemo(() => {
+    if (!driverLocation?.latitude) {
+      return {eta: '-- min', distance: '-- km'};
+    }
+
+    let distance;
+
+    if (driverToUserRoute.length > 1) {
+      distance = calculateRouteDistance(driverToUserRoute);
+    } else {
+      distance = calculateHaversineDistance(driverLocation, userLocation);
+    }
+
+    const eta = Math.max(Math.round(distance * 10), 3);
+
+    return {
+      eta: `${eta} min`,
+      distance: `${distance.toFixed(1)} km`,
+    };
+  }, [
+    driverLocation,
+    userLocation,
+    driverToUserRoute,
+    calculateRouteDistance,
+    calculateHaversineDistance,
+  ]);
+
+  // PanResponder untuk modal
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 5;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        const currentYValue = modalY._value;
+        const newY = currentYValue + gestureState.dy;
+
+        // Batasi pergerakan modal
+        if (newY >= MODAL_MIN_HEIGHT && newY <= SCREEN_HEIGHT * 0.8) {
+          modalY.setValue(newY);
+          // Update map padding secara real-time saat modal di-drag
+          setMapPadding({bottom: SCREEN_HEIGHT - newY});
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const currentY = modalY._value;
+        const swipeDistance = gestureState.dy;
+        const swipeVelocity = gestureState.vy;
+
+        const SWIPE_THRESHOLD = 50;
+        const VELOCITY_THRESHOLD = 0.5;
+
+        if (
+          swipeDistance < -SWIPE_THRESHOLD ||
+          swipeVelocity < -VELOCITY_THRESHOLD
+        ) {
+          openModalFull();
+        } else if (
+          swipeDistance > SWIPE_THRESHOLD ||
+          swipeVelocity > VELOCITY_THRESHOLD
+        ) {
+          openModalPartial();
+        } else {
+          if (currentY > SCREEN_HEIGHT * 0.65) {
+            openModalPartial();
+          } else {
+            openModalFull();
+          }
+        }
+      },
+    }),
+  ).current;
+
+  // Handlers
+  const handleManualReconnect = () => {
+    reconnectSocket();
+  };
+
+  const handleMapPress = () => {
+    if (!isModalVisible) {
+      openModalPartial();
+    } else {
+      openModalFull();
+    }
+  };
+
+  const handleOverlayPress = () => {
+    openModalPartial();
+  };
+
+  const handleCallDriver = () => {
+    if (user?.phone) {
+      Alert.alert(
+        'Hubungi Driver',
+        `Apakah Anda ingin menghubungi ${user?.username || 'Driver'}?`,
+        [
+          {text: 'Batal', style: 'cancel'},
+          {
+            text: 'Telepon',
+            onPress: () => console.log('Memanggil user:', user.phone),
+          },
+        ],
+      );
+    } else {
+      Alert.alert('Info', 'Nomor telepon user tidak tersedia');
+    }
+  };
+
+  const handleMessageDriver = () => {
+    if (user?.phone) {
+      console.log('Mengirim pesan ke user:', user.phone);
+    } else {
+      Alert.alert('Info', 'Nomor telepon user tidak tersedia');
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#4E1F1A" barStyle="light-content" />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Icons name="arrow-back" size={24} color="#FCEBD7" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Driver Ditemukan</Text>
-        <TouchableOpacity onPress={openDriverModal} style={styles.infoButton}>
-          <Icons name="info-outline" size={24} color="#FCEBD7" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Peta */}
-        <View style={styles.mapContainer}>
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            initialRegion={{
-              latitude: driverLocation.latitude,
-              longitude: driverLocation.longitude,
-              latitudeDelta: LATITUDE_DELTA,
-              longitudeDelta: LONGITUDE_DELTA,
-            }}
-            showsUserLocation={false}
-            followsUserLocation={false}>
+      {/* Map View dengan padding dinamis */}
+      <TouchableOpacity
+        style={styles.mapTouchable}
+        activeOpacity={1}
+        onPress={handleMapPress}>
+        <MapView
+          ref={mapRef}
+          provider="google"
+          style={styles.map}
+          initialRegion={{
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02 * (width / SCREEN_HEIGHT),
+          }}
+          mapPadding={{
+            top: 50,
+            right: 10,
+            bottom: mapPadding.bottom + 80,
+            left: 10,
+          }}
+          showsUserLocation={false}
+          showsMyLocationButton={false}
+          rotateEnabled={true}
+          toolbarEnabled={false}>
+          {/* Driver Marker */}
+          {driverLocation?.latitude && (
             <Marker
               coordinate={driverLocation}
               pinColor="blue"
               title="Driver Anda"
+              description={`${driverToUserInfo.distance} dari lokasi Anda`}
             />
-            <Marker
-              coordinate={userLocation}
-              pinColor="green"
-              title="Lokasi Anda"
-            />
-            <Marker
-              coordinate={destinationLocation}
-              pinColor="red"
-              title="Tujuan"
-            />
+          )}
+
+          {/* User/Pickup Marker */}
+          <Marker
+            coordinate={userLocation}
+            title="Lokasi Penjemputan"
+            pinColor="green"
+            description="Titik penjemputan Anda"
+          />
+
+          {/* Destination Marker */}
+          <Marker
+            coordinate={destinationLocation}
+            title="Tujuan"
+            pinColor="red"
+            description={destination?.name || 'Lokasi tujuan'}
+          />
+
+          {/* Routes dari OSRM */}
+          {driverToUserRoute.length > 0 && (
             <Polyline
-              coordinates={polylineCoordinates}
-              strokeColor="#4E1F1A"
-              strokeWidth={3}
-              lineDashPattern={[5, 5]}
+              coordinates={driverToUserRoute}
+              strokeColor="#3498db"
+              strokeWidth={5}
+              lineCap="round"
+              lineJoin="round"
             />
-          </MapView>
-        </View>
+          )}
 
-        {/* UI Utama */}
-        <View style={styles.driverCard}>
-          <View style={styles.driverHeader}>
-            <View style={styles.driverProfile}>
-              <Image
-                source={{uri: driverInfo.avatar}}
-                style={styles.driverAvatar}
+          {userToDestinationRoute.length > 0 && (
+            <Polyline
+              coordinates={userToDestinationRoute}
+              strokeColor="#e74c3c"
+              strokeWidth={5}
+              lineCap="round"
+              lineJoin="round"
+            />
+          )}
+        </MapView>
+      </TouchableOpacity>
+
+      {/* Connection Status Banner */}
+      <View style={styles.topBanner}>
+        {!isConnected && (
+          <View style={[styles.statusBanner, styles.disconnectedBanner]}>
+            <Icons name="wifi-off" size={16} color="#FFF" />
+            <Text style={styles.statusBannerText}>
+              {isConnecting ? 'Menghubungkan...' : 'Koneksi terputus'}
+            </Text>
+            <TouchableOpacity onPress={handleManualReconnect}>
+              <Icons name="refresh" size={16} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isConnected && driverLocation && (
+          <View style={[styles.statusBanner, styles.connectedBanner]}>
+            <Icons name="directions-bike" size={16} color="#FFF" />
+            <Text style={styles.statusBannerText}>
+              Driver {driverToUserInfo.distance} dari Anda • ETA:{' '}
+              {driverToUserInfo.eta}
+            </Text>
+          </View>
+        )}
+
+        {isConnected && !driverLocation && (
+          <View style={[styles.statusBanner, styles.waitingBanner]}>
+            <Icons name="schedule" size={16} color="#FFF" />
+            <Text style={styles.statusBannerText}>
+              Menunggu lokasi driver...
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Modal */}
+      <>
+        {isModalVisible && (
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={handleOverlayPress}
+          />
+        )}
+
+        <Animated.View
+          style={[
+            styles.modal,
+            {
+              transform: [{translateY: modalY}],
+            },
+          ]}>
+          <View style={styles.modalHandle} {...panResponder.panHandlers}>
+            <View style={styles.handleBar} />
+          </View>
+
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Driver akan segera datang</Text>
+
+            {/* Informasi Pesanan */}
+            <View style={styles.row}>
+              <FloatingInput
+                label="Lokasi Tujuan"
+                value={destination?.name || '—'}
+                editable={false}
+                selectTextOnFocus={false}
               />
-              <View style={styles.driverTextInfo}>
-                <Text style={styles.driverName}>{driverInfo.name}</Text>
-                <View style={styles.ratingContainer}>
-                  <Icons name="star" size={16} color="#FFD700" />
-                  <Text style={styles.ratingText}>{driverInfo.rating}</Text>
-                </View>
-              </View>
             </View>
-            <View style={styles.etaContainer}>
-              <Text style={styles.etaTime}>{driverInfo.eta}</Text>
-              <Text style={styles.etaLabel}>Perkiraan</Text>
+
+            <View style={styles.row}>
+              <FloatingInput
+                label="Alamat Rumah"
+                value={order?.pick_up_location || '—'}
+                editable={false}
+                selectTextOnFocus={false}
+              />
             </View>
-          </View>
 
-          <View style={styles.vehicleInfo}>
-            <Icons name="directions-bike" size={20} color="#4E1F1A" />
-            <Text style={styles.vehicleText}>{driverInfo.vehicle}</Text>
-            <Text style={styles.plateText}>{driverInfo.plateNumber}</Text>
-          </View>
-
-          <View style={styles.distanceInfo}>
-            <Text style={styles.distanceText}>{driverInfo.distance}</Text>
-            <Text style={styles.distanceLabel}>Jarak driver</Text>
-          </View>
-        </View>
-
-        <View style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <Icons name="location-on" size={24} color="#4E1F1A" />
-            <Text style={styles.statusTitle}>Driver akan segera datang</Text>
-          </View>
-          <View style={styles.statusProgress}>
-            <View style={styles.progressStep}>
-              <View style={[styles.progressDot, styles.activeDot]} />
-              <Text style={styles.progressText}>Driver Menuju Lokasi</Text>
-            </View>
-            <View style={styles.progressLine} />
-            <View style={styles.progressStep}>
-              <View style={styles.progressDot} />
-              <Text style={styles.progressText}>Penjemputan</Text>
-            </View>
-            <View style={styles.progressLine} />
-            <View style={styles.progressStep}>
-              <View style={styles.progressDot} />
-              <Text style={styles.progressText}>Perjalanan</Text>
-            </View>
-            <View style={styles.progressLine} />
-            <View style={styles.progressStep}>
-              <View style={styles.progressDot} />
-              <Text style={styles.progressText}>Sampai Tujuan</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.locationCard}>
-          <View style={styles.locationSection}>
-            <Text style={styles.sectionLabel}>Lokasi tujuan</Text>
-            <Text style={styles.locationText}>
-              {order?.destination?.name || 'Fakultas Ilmu Komputer 2'}
-            </Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.locationSection}>
-            <Text style={styles.sectionLabel}>Alamat Rumah</Text>
-            <Text style={styles.locationText}>
-              {order?.pick_up_location || 'Rungkut Mapan OG SA No. 2'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.callButton]}
-            onPress={handleCallDriver}>
-            <Icons name="call" size={24} color="#FCEBD7" />
-            <Text style={styles.actionButtonText}>Telepon</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.messageButton]}
-            onPress={handleMessageDriver}>
-            <Icons name="chat" size={24} color="#FCEBD7" />
-            <Text style={styles.actionButtonText}>Pesan</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={handleCancelOrder}>
-          <Text style={styles.cancelButtonText}>Batalkan Perjalanan</Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-      {/* === DRIVER MODAL DARI BAWAH === */}
-      <Modal
-        visible={isDriverModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={closeDriverModal}>
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={closeDriverModal}>
-          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Detail Driver</Text>
-              <TouchableOpacity onPress={closeDriverModal}>
-                <Icons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.modalScrollView}>
-              <View style={styles.driverInfoRow}>
-                <Image
-                  source={{uri: driverInfo.avatar}}
-                  style={styles.driverAvatar}
+            <View style={styles.infoRow}>
+              <Image
+                source={{uri: user?.photo_profile}}
+                style={styles.avatar}
+              />
+              <View>
+                <FloatingInput
+                  label="Nama Driver"
+                  value={user?.username || '—'}
+                  editable={false}
+                  selectTextOnFocus={false}
                 />
-                <View>
-                  <Text style={styles.driverName}>{driverInfo.name}</Text>
-                  <View style={styles.ratingRow}>
-                    <Icons name="star" size={16} color="#FFD700" />
-                    <Text style={styles.ratingText}>{driverInfo.rating}</Text>
-                  </View>
+                <View style={styles.infoRowTwo}>
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={handleMessageDriver}>
+                    <IconWA
+                      name="whatsapp"
+                      size={40}
+                      color="#4E1F1A"
+                      style={styles.iconCall}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={handleCallDriver}>
+                    <IconPhone
+                      name="phone"
+                      size={40}
+                      color="#4E1F1A"
+                      style={styles.iconCall}
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
+            </View>
 
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Kendaraan</Text>
-                <Text style={styles.infoValue}>{driverInfo.vehicle}</Text>
-              </View>
-
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Plat Nomor</Text>
-                <Text style={styles.infoValue}>{driverInfo.plateNumber}</Text>
-              </View>
-
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Jarak dari Anda</Text>
-                <Text style={styles.infoValue}>{driverInfo.distance}</Text>
-              </View>
-
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Estimasi Tiba</Text>
-                <Text style={styles.infoValue}>{driverInfo.eta}</Text>
-              </View>
-
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Nomor Telepon</Text>
-                <Text style={styles.infoValue}>{driverInfo.phone}</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.callDriverButton}
-                onPress={() => {
-                  closeDriverModal();
-                  handleCallDriver();
-                }}>
-                <Text style={styles.callDriverButtonText}>Hubungi Driver</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+            <View style={styles.infoRowThree}>
+              <Text style={styles.infoLabel}>Harga:</Text>
+              <Text style={styles.infoValue}>Rp. 7.000</Text>
+            </View>
+          </View>
+        </Animated.View>
+      </>
     </View>
   );
 };
@@ -354,292 +546,138 @@ const OrderingUserScreen = ({route, navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9F1E2',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
     backgroundColor: '#4E1F1A',
   },
-  backButton: {padding: 8},
-  infoButton: {padding: 8},
-  headerTitle: {fontSize: 20, fontWeight: 'bold', color: '#FCEBD7'},
-  content: {
+  mapTouchable: {
     flex: 1,
-    padding: 20,
-  },
-  mapContainer: {
-    height: 200,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-    backgroundColor: '#eee',
   },
   map: {
     width: '100%',
     height: '100%',
   },
-  driverCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  topBanner: {
+    position: 'absolute',
+    top: 30,
+    left: 20,
+    right: 20,
+    zIndex: 90,
   },
-  driverHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  driverProfile: {
+  statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  driverAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 12,
-  },
-  driverName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4E1F1A',
-    marginBottom: 4,
-  },
-  ratingContainer: {flexDirection: 'row', alignItems: 'center'},
-  ratingText: {
-    marginLeft: 4,
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '600',
-  },
-  etaContainer: {alignItems: 'flex-end'},
-  etaTime: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#4E1F1A',
-  },
-  etaLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  vehicleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FCEBD7',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 12,
-  },
-  vehicleText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4E1F1A',
-    marginLeft: 8,
-  },
-  plateText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#4E1F1A',
-    backgroundColor: '#E8D5C4',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  distanceInfo: {
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E8E8E8',
-  },
-  distanceText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4E1F1A',
-  },
-  distanceLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  statusCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  statusHeader: {flexDirection: 'row', alignItems: 'center', marginBottom: 20},
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4E1F1A',
-    marginLeft: 8,
+  disconnectedBanner: {
+    backgroundColor: '#FF9800',
   },
-  statusProgress: {alignItems: 'flex-start'},
-  progressStep: {flexDirection: 'row', alignItems: 'center', marginBottom: 8},
-  progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E8E8E8',
-    marginRight: 12,
+  connectedBanner: {
+    backgroundColor: '#4CAF50',
   },
-  activeDot: {backgroundColor: '#4E1F1A'},
-  progressLine: {
-    width: 2,
-    height: 20,
-    backgroundColor: '#E8E8E8',
-    marginLeft: 5,
-    marginBottom: 8,
+  waitingBanner: {
+    backgroundColor: '#2196F3',
   },
-  progressText: {
-    fontSize: 14,
-    color: '#4E1F1A',
-    fontWeight: '500',
-  },
-  locationCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  locationSection: {marginBottom: 16},
-  sectionLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
-  locationText: {
-    fontSize: 16,
-    color: '#4E1F1A',
-    fontWeight: '600',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E8E8E8',
-    marginVertical: 12,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  actionButton: {
+  statusBannerText: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginHorizontal: 6,
-  },
-  callButton: {backgroundColor: '#4E1F1A'},
-  messageButton: {backgroundColor: '#BB8B6D'},
-  actionButtonText: {
-    color: '#FCEBD7',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#FFF',
     marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '500',
   },
-  cancelButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E8E8E8',
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // === MODAL STYLES ===
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    zIndex: 40,
+  },
+  modal: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: SCREEN_HEIGHT,
+    backgroundColor: '#BB8B6D',
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    zIndex: 50,
+    paddingHorizontal: 30,
+    paddingTop: 10,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: -2},
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 10,
+  },
+  modalHandle: {
+    paddingVertical: 10,
+    paddingHorizontal: '40%',
+    alignSelf: 'center',
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#F9F1E2',
+    borderRadius: 2,
   },
   modalContent: {
-    backgroundColor: '#F9F1E2',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8E8E8',
+    flex: 1,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4E1F1A',
+    fontSize: 20,
+    color: '#F9F1E2',
+    marginBottom: 30,
+    marginTop: 10,
+    fontWeight: '600',
   },
-  modalScrollView: {
-    padding: 20,
+  row: {
+    marginBottom: 15,
   },
-  driverInfoRow: {
+  infoRow: {
     flexDirection: 'row',
+    marginBottom: 15,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    gap: 15,
+    width: '100%',
   },
-  infoItem: {
-    marginBottom: 16,
+  infoRowTwo: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 15,
+    gap: 30,
+  },
+  infoRowThree: {
+    flexDirection: 'row',
+    marginTop: 25,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 20,
+    width: '100%',
+  },
+  iconCall: {
+    backgroundColor: '#F9F1E2',
+    padding: 15,
+    borderRadius: 50,
+  },
+  avatar: {
+    width: 150,
+    height: 150,
+    borderRadius: 40,
   },
   infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: 20,
+    color: '#F9F1E2',
+    fontWeight: '600',
   },
   infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4E1F1A',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  callDriverButton: {
-    backgroundColor: '#4E1F1A',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  callDriverButtonText: {
-    color: '#FCEBD7',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 20,
+    color: '#A9F1F9',
+    fontWeight: 'bold',
   },
 });
 

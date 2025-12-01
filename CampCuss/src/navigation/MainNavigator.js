@@ -15,7 +15,7 @@ import LoginDriverScreen from '../screens/LoginDriverScreen';
 import AddressScreen from '../screens/AddressScreen';
 import SearchingDriverScreen from '../screens/SearchingDriverScreen';
 import OrderingUserScreen from '../screens/OrderingUserScreen';
-// import OrderingDriverScreen from '../screens/OrderingDriverScreen';
+import OrderingDriverScreen from '../screens/OrderingDriverScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,7 +29,7 @@ const CustomerNavigator = () => (
     <Stack.Screen name="LoginDriver" component={LoginDriverScreen} />
     <Stack.Screen name="Address" component={AddressScreen} />
     <Stack.Screen name="SearchingDriver" component={SearchingDriverScreen} />
-    <Stack.Screen name="OrderingScreen" component={OrderingUserScreen} />
+    <Stack.Screen name="OrderingUser" component={OrderingUserScreen} />
   </Stack.Navigator>
 );
 
@@ -40,7 +40,7 @@ const DriverNavigator = () => (
     <Stack.Screen name="History" component={StoryDriverScreen} />
     <Stack.Screen name="Profile" component={ProfileScreen} />
     <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-    {/* <Stack.Screen name="OrderingDriver" component={OrderingDriverScreen} /> */}
+    <Stack.Screen name="OrderingDriver" component={OrderingDriverScreen} />
   </Stack.Navigator>
 );
 

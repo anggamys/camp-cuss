@@ -3,6 +3,7 @@
 import React, {useRef, useEffect} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, Animated} from 'react-native';
 import {useAuth} from '../hooks/useAuth';
+import {useSideBar} from '../hooks/useSideBar';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconDriver from 'react-native-vector-icons/FontAwesome';
 
@@ -13,12 +14,11 @@ export default function Sidebar({
   onClose,
   isActive,
   onToggleActive,
-  onEditProfile,
-  onLoginDriver,
   isProfileScreen = false,
 }) {
   const {user, logout} = useAuth();
   const slideAnim = useRef(new Animated.Value(SIDEBAR_WIDTH)).current;
+  const { goToEditProfile, goToLoginDriver } = useSideBar();
 
   useEffect(() => {
     Animated.timing(slideAnim, {
@@ -60,7 +60,7 @@ export default function Sidebar({
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={styles.menuItem} onPress={onEditProfile}>
+        <TouchableOpacity style={styles.menuItem} onPress={goToEditProfile}>
           <Icon name="edit-note" size={24} style={styles.icon} />
           <Text style={styles.menuLabel}>Edit Akun</Text>
         </TouchableOpacity>
@@ -72,7 +72,7 @@ export default function Sidebar({
 
         {/* Login sebagai Driver — hanya untuk customer */}
         {user?.role === 'customer' && (
-          <TouchableOpacity style={styles.menuItem} onPress={onLoginDriver}>
+          <TouchableOpacity style={styles.menuItem} onPress={goToLoginDriver}>
             <IconDriver
               name="drivers-license-o"
               size={20}
