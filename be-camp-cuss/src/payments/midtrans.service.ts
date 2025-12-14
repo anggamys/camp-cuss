@@ -19,9 +19,9 @@ export class MidtransService {
   constructor(private readonly logger: AppLoggerService) {
     try {
       this.coreApi = new CoreApi({
-        isProduction: Env.MIDTRANS_IS_PRODUCTION === 'true',
-        serverKey: Env.SERVER_KEY,
-        clientKey: Env.CLIENT_KEY,
+        isProduction: Env.MIDTRANS_ENV === 'production' ? true : false,
+        serverKey: Env.MIDTRANS_SERVER_KEY,
+        clientKey: Env.MIDTRANS_CLIENT_KEY,
       });
 
       this.logger.log(

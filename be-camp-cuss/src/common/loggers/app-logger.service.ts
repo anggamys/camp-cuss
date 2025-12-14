@@ -40,7 +40,7 @@ export class AppLoggerService implements LoggerService {
             }),
           ),
         }),
-        ...(Env.LOG_TO_FILE === 'true'
+        ...(Env.APP_LOG_TO_FILE === 'true'
           ? [
               new transports.File({
                 filename: 'logs/app.log',

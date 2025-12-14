@@ -11,7 +11,7 @@ export const RedisProvider: Provider[] = [
   {
     provide: REDIS_CLIENT,
     useFactory: (logger: AppLoggerService): Redis => {
-      const url = Env.REDIS_URL || '';
+      const url = `redis://${Env.REDIS_HOST}:${Env.REDIS_PORT}`;
       const client = new Redis(url);
       client.on('connect', () =>
         logger.log(`[Redis] Publisher connected -> ${url}`, context),

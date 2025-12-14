@@ -108,7 +108,7 @@ export class PaymentsMidtransService {
         },
         gopay: {
           enableCallback: false,
-          callbackUrl: Env.ENDPOINT_URL ?? '',
+          callbackUrl: Env.APP_URL ?? '',
         },
       };
 
