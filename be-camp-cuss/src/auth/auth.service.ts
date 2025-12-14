@@ -36,12 +36,14 @@ export class AuthService {
     await this.validation.assertUnique('user', 'username', dto.username);
 
     const hashed = await PasswordHelper.hash(dto.password);
+
     const user = await this.prisma.user.create({
       data: { ...dto, password: hashed },
       select: { id: true, email: true, username: true },
     });
 
     this.logger.log(`User registered id=${user.id}`, this.context);
+
     return user;
   }
 
@@ -51,10 +53,12 @@ export class AuthService {
     this.logger.log(`Login attempt: ${username}`, this.context);
 
     const user = await this.prisma.user.findUnique({ where: { username } });
+
     if (!user)
       throw new HttpException('Pengguna tidak ditemukan', HttpStatus.NOT_FOUND);
 
     const valid = await bcrypt.compare(password, user.password);
+
     if (!valid)
       throw new HttpException('Password salah', HttpStatus.UNAUTHORIZED);
 
@@ -63,6 +67,7 @@ export class AuthService {
       this.config,
       user,
     );
+
     const refresh = await TokenHelper.generateRefreshToken(
       this.jwt,
       this.config,
@@ -77,6 +82,7 @@ export class AuthService {
     });
 
     this.logger.log(`Login success: userId=${user.id}`, this.context);
+
     return { access_token: access, refresh_token: refresh };
   }
 
@@ -91,14 +97,20 @@ export class AuthService {
     );
 
     const userId = Number(decoded.sub);
+
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
     if (!user || !user.refresh_token)
-      throw new HttpException('Token tidak valid', HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        'Refresh token tidak ditemukan, silakan login kembali',
+        HttpStatus.UNAUTHORIZED,
+      );
 
     const match = await PasswordHelper.compare(
       refresh_token,
       user.refresh_token,
     );
+
     if (!match)
       throw new HttpException('Token tidak valid', HttpStatus.UNAUTHORIZED);
 
@@ -109,6 +121,7 @@ export class AuthService {
     );
 
     this.logger.log(`Token refreshed for userId=${user.id}`, this.context);
+
     return { access_token: newAccess };
   }
 
@@ -119,6 +132,7 @@ export class AuthService {
     });
 
     if (accessToken) this.tokenStore.add(accessToken);
+
     this.logger.log(`User logout success: id=${userId}`, this.context);
   }
 

@@ -1,8 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 
@@ -20,26 +15,26 @@ import { OrdersCoreService } from '../src/orders/services/orders-core.service';
 
 import { AppLoggerService } from '../src/common/loggers/app-logger.service';
 
-import * as path from 'path';
-import { StoragesService } from '../src/storages/storages.service';
-
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
   const usersService = app.get(UsersService);
   const usersDriverRequestService = app.get(UsersDriverRequestService);
   const destinationsService = app.get(DestinationsService);
   const ordersService = app.get(OrdersCoreService);
-  const storagesService = app.get(StoragesService);
   const logger = app.get(AppLoggerService);
   const loggerName = 'Seeder';
 
   try {
+    // Hapus semua data di database (urutan: orders -> users -> destinations)
     await ordersService['prisma'].order.deleteMany();
+    await ordersService['prisma'].driverRequest.deleteMany();
     await usersService['prisma'].user.deleteMany();
     await destinationsService['prisma'].destination.deleteMany();
+    // TODO: Tambahkan penghapusan data tabel lain jika ada relasi (misal: payments, notifications, dsb)
 
-    logger.log('Semua data berhasil dihapus.', loggerName);
+    logger.log('Semua data di database berhasil dihapus.', loggerName);
 
+    // Mulai proses seeding data baru
     // Daftar user untuk seed
     const seedUsers: Partial<CreateUserDto>[] = [
       {
@@ -92,19 +87,46 @@ async function bootstrap() {
       },
     ];
 
-    const createdUsers: any[] = [];
+    interface CreatedUser {
+      id: string;
+      username: string;
+      email: string;
+      npm: string;
+      no_phone: string;
+      password: string;
+      role: string;
+      photo_driving_license?: string;
+      photo_profile?: string;
+      photo_id_card?: string;
+      photo_student_card?: string;
+      // Add other properties returned by usersService.create if needed
+    }
+
+    const createdUsers: CreatedUser[] = [];
     for (const userData of seedUsers) {
       const created = await usersService.create(userData as CreateUserDto);
 
-      createdUsers.push(created);
+      createdUsers.push({
+        id: String(created.id),
+        username: created.username,
+        email: created.email,
+        npm: userData.npm!,
+        no_phone: userData.no_phone!,
+        password: userData.password!,
+        role: userData.role!,
+        photo_driving_license: userData.photo_driving_license,
+        photo_profile: userData.photo_profile,
+        photo_id_card: userData.photo_id_card,
+        photo_student_card: userData.photo_student_card,
+      });
       logger.log(`User ${created.username} berhasil dibuat`, loggerName);
     }
 
     // Ambil ID sesuai role
-    const admin = createdUsers.find((u) => u.role === 'admin');
-    const customer = createdUsers.find((u) => u.username === 'customer01');
-    const driver01 = createdUsers.find((u) => u.username === 'driver01');
-    const customer02 = createdUsers.find((u) => u.username === 'customer02');
+    // const admin = createdUsers.find((u) => u.role === 'admin');
+    const customer = createdUsers.find((u) => u.username === 'customer01')!;
+    // const driver01 = createdUsers.find((u) => u.username === 'driver01')!;
+    const customer02 = createdUsers.find((u) => u.username === 'customer02')!;
 
     // Destinasi
     const seedDestinations: Partial<
@@ -136,36 +158,40 @@ async function bootstrap() {
       },
     ];
 
-    const createdDestinations: any[] = [];
+    type CreatedDestination = {
+      id: number;
+      name: string;
+      estimated: number;
+      image_place: string;
+    };
+    const createdDestinations: CreatedDestination[] = [];
     for (const dest of seedDestinations) {
       const created = await destinationsService.create({
         name: dest.name!,
         estimated: dest.estimated!,
         image_place: dest.imageFile!,
       });
-      createdDestinations.push(created);
+      createdDestinations.push(created as CreatedDestination);
       logger.log(`Destination ${created.name} berhasil dibuat`, loggerName);
     }
 
     // Driver request
-    const driverRequest = await usersDriverRequestService.createDriverRequest(
-      customer02.id,
-      {
-        user_notes: 'Saya ingin menjadi driver karena saya suka mengemudi.',
-      } as CreateDriverRequest,
-    );
+    await usersDriverRequestService.createDriverRequest(Number(customer02.id), {
+      user_notes: 'Saya ingin menjadi driver karena saya suka mengemudi.',
+    } as CreateDriverRequest);
     logger.log(
       `Driver request untuk ${customer02.username} berhasil dibuat`,
       loggerName,
     );
 
     // Order dummy
-    const order = await ordersService.create(customer.id, {
+    await ordersService.create(Number(customer.id), {
       destination_id: createdDestinations[1].id,
       pick_up_location: 'Jl. Teknik Informatika No. 10',
-      pick_up_latitude: -7.290293,
-      pick_up_longitude: 112.792812,
+      pick_up_latitude: -7.329504,
+      pick_up_longitude: 112.790534,
     } as CreateOrderDto);
+
     logger.log(`Order untuk ${customer.username} berhasil dibuat`, loggerName);
 
     logger.log('Seeding selesai.', loggerName);

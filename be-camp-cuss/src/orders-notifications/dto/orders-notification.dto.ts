@@ -12,9 +12,9 @@ export class OrderAvailableNotificationDto {
   @IsNumber({}, { message: 'ID harus berupa angka' })
   id: number;
 
-  @IsNotEmpty({ message: 'User ID tidak boleh kosong' })
-  @IsNumber({}, { message: 'User ID harus berupa angka' })
-  user_id: number;
+  @IsNotEmpty({ message: 'Customer ID tidak boleh kosong' })
+  @IsNumber({}, { message: 'Customer ID harus berupa angka' })
+  customer_id: number;
 
   @IsOptional()
   @IsNumber({}, { message: 'Driver ID harus berupa angka' })

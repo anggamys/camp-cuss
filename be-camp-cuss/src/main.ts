@@ -52,12 +52,12 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: Env.CORS_ORIGINS.length > 0 ? Env.CORS_ORIGINS : '*',
+    origin: Env.APP_CORS_ORIGINS.length > 0 ? Env.APP_CORS_ORIGINS : '*',
     credentials: true,
   });
 
   // Jalankan HTTP server
-  const port = Env.PORT;
+  const port = Env.APP_PORT;
   await app.listen(port);
   logger.log(`Server berjalan di port ${port}`, 'Bootstrap');
 }

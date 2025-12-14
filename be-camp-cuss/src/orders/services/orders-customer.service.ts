@@ -14,10 +14,10 @@ export class OrdersCustomerService {
     private readonly logger: AppLoggerService,
   ) {}
 
-  async findByUserId(userId: number): Promise<Order[]> {
+  async findByCustomerId(customerId: number): Promise<Order[]> {
     try {
       return await this.prisma.order.findMany({
-        where: { user_id: userId },
+        where: { customer_id: customerId },
         orderBy: { created_at: 'desc' },
       });
     } catch (e) {
@@ -26,7 +26,7 @@ export class OrdersCustomerService {
     }
   }
 
-  async cancelOrder(orderId: number, userId: number): Promise<Order> {
+  async cancelOrder(orderId: number, customerId: number): Promise<Order> {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -38,7 +38,7 @@ export class OrdersCustomerService {
           HttpStatus.NOT_FOUND,
         );
 
-      if (order.user_id !== userId)
+      if (order.customer_id !== customerId)
         throw new HttpException('Tidak berwenang', HttpStatus.FORBIDDEN);
 
       if (order.status === String(OrderStatus.completed))
@@ -53,9 +53,10 @@ export class OrdersCustomerService {
       });
 
       this.logger.warn(
-        `Pesanan ${orderId} dibatalkan oleh user ${userId}`,
+        `Pesanan ${orderId} dibatalkan oleh user ${customerId}`,
         this.context,
       );
+
       return updated;
     } catch (e) {
       if (e instanceof HttpException) throw e;
