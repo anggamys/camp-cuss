@@ -29,11 +29,8 @@ export class CreateOrderResponseDto {
   @IsNumber({}, { message: 'ID harus berupa angka' })
   id: number;
 
-  @IsString({ message: 'Kode order harus berupa teks' })
-  order_code: string;
-
   @IsNumber({}, { message: 'User ID harus berupa angka' })
-  user_id: number;
+  customer_id: number;
 
   @IsOptional()
   @IsNumber({}, { message: 'Driver ID harus berupa angka' })

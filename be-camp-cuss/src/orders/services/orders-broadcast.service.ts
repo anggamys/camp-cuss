@@ -67,9 +67,12 @@ export class OrdersBroadcastService implements OnModuleInit {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
+
     if (!order || order.status !== String(OrderStatus.pending)) {
       this.stopBroadcast(orderId);
+
       this.logger.log(`Broadcast order #${orderId} dihentikan`);
+
       return;
     }
 
@@ -80,8 +83,10 @@ export class OrdersBroadcastService implements OnModuleInit {
 
   stopBroadcast(orderId: number): void {
     const interval = this.activeIntervals.get(orderId);
+
     if (interval) {
       clearInterval(interval);
+
       this.activeIntervals.delete(orderId);
     }
   }

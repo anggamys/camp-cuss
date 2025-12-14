@@ -28,7 +28,6 @@ export class OrdersDriverService {
         ]);
 
         if (!order) {
-          this.logger.warn(`Pesanan #${orderId} tidak ditemukan`, this.context);
           throw new HttpException(
             'Pesanan tidak ditemukan',
             HttpStatus.NOT_FOUND,
@@ -36,29 +35,39 @@ export class OrdersDriverService {
         }
 
         if (!driver || driver.role !== UserRole.driver) {
-          this.logger.debug(`User ${driverId} bukan driver`, this.context);
           throw new HttpException(
             'Pengguna bukan driver',
             HttpStatus.BAD_REQUEST,
           );
         }
 
-        if (order.status === String(OrderStatus.canceled)) {
+        const activeOrder = await tx.order.findFirst({
+          where: {
+            driver_id: driverId,
+            status: { in: [OrderStatus.accepted, OrderStatus.pending] },
+          },
+        });
+
+        if (activeOrder) {
           this.logger.warn(
-            `Pesanan #${orderId} sudah dibatalkan`,
+            `Driver ${driverId} masih memiliki order aktif #${activeOrder.id}`,
             this.context,
           );
+
+          throw new HttpException(
+            `Selesaikan pesanan #${activeOrder.id} terlebih dahulu`,
+            HttpStatus.CONFLICT,
+          );
+        }
+
+        if ((order.status as OrderStatus) === OrderStatus.canceled) {
           throw new HttpException(
             'Pesanan sudah dibatalkan',
             HttpStatus.BAD_REQUEST,
           );
         }
 
-        if (order.status !== String(OrderStatus.pending)) {
-          this.logger.warn(
-            `Pesanan #${orderId} tidak dalam status pending`,
-            this.context,
-          );
+        if ((order.status as OrderStatus) !== OrderStatus.pending) {
           throw new HttpException(
             'Pesanan tidak dapat diterima',
             HttpStatus.BAD_REQUEST,
@@ -72,11 +81,10 @@ export class OrdersDriverService {
         });
 
         if (updated.count === 0) {
-          this.logger.warn(
-            `Pesanan #${orderId} sudah diambil driver lain`,
-            this.context,
+          throw new HttpException(
+            'Pesanan sudah diambil driver lain',
+            HttpStatus.CONFLICT,
           );
-          throw new HttpException('Pesanan sudah diambil', HttpStatus.CONFLICT);
         }
 
         this.logger.log(
@@ -87,31 +95,19 @@ export class OrdersDriverService {
         const updatedOrder = await tx.order.findUnique({
           where: { id: orderId },
         });
-        if (!updatedOrder) {
-          this.logger.error(
-            `Pesanan #${orderId} tidak ditemukan setelah update`,
-            undefined,
-            this.context,
-          );
-          throw new HttpException(
-            'Pesanan tidak ditemukan setelah update',
-            HttpStatus.INTERNAL_SERVER_ERROR,
-          );
-        }
 
-        return updatedOrder;
+        return updatedOrder!;
       });
     } catch (e) {
-      // hanya log error berat (bukan error bisnis seperti 400/409)
       if (!(e instanceof HttpException)) {
         this.logger.error(
           `Kesalahan tak terduga saat menerima pesanan #${orderId} oleh driver ${driverId}`,
           e instanceof Error ? e.stack : String(e),
           this.context,
         );
+
         PrismaErrorHelper.handle(e);
       } else {
-        // cukup warn, bukan error
         this.logger.warn(`Operasi dibatalkan: ${e.message}`, this.context);
       }
       throw e;
@@ -130,7 +126,6 @@ export class OrdersDriverService {
       });
 
       if (!order) {
-        this.logger.warn(`Pesanan #${orderId} tidak ditemukan`, this.context);
         throw new HttpException(
           'Pesanan tidak ditemukan',
           HttpStatus.NOT_FOUND,
@@ -138,22 +133,14 @@ export class OrdersDriverService {
       }
 
       if (order.driver_id !== driverId) {
-        this.logger.warn(
-          `Driver ${driverId} mencoba menyelesaikan pesanan milik ${order.driver_id}`,
-          this.context,
+        throw new HttpException(
+          'Tidak berwenang menyelesaikan pesanan ini',
+          HttpStatus.FORBIDDEN,
         );
-        throw new HttpException('Tidak berwenang', HttpStatus.FORBIDDEN);
       }
 
-      if (order.status !== String(OrderStatus.accepted)) {
-        this.logger.warn(
-          `Pesanan #${orderId} belum dalam status accepted`,
-          this.context,
-        );
-        throw new HttpException(
-          'Pesanan belum diterima',
-          HttpStatus.BAD_REQUEST,
-        );
+      if ((order.status as OrderStatus) !== OrderStatus.accepted) {
+        throw new HttpException('Pesanan belum aktif', HttpStatus.BAD_REQUEST);
       }
 
       const updated = await this.prisma.order.update({
@@ -165,6 +152,7 @@ export class OrdersDriverService {
         `Driver ${driverId} menyelesaikan pesanan #${orderId}`,
         this.context,
       );
+
       return updated;
     } catch (e) {
       this.logger.error(
@@ -172,7 +160,9 @@ export class OrdersDriverService {
         e instanceof Error ? e.stack : String(e),
         this.context,
       );
+
       if (e instanceof HttpException) throw e;
+
       PrismaErrorHelper.handle(e);
     }
   }

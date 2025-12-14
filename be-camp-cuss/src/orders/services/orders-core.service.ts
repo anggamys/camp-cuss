@@ -10,8 +10,6 @@ import { Order, OrderStatus } from '@prisma/client';
 import { OrdersBroadcastService } from './orders-broadcast.service';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 import { Role } from '../../common/enums/role.enum';
-import { generateOrderCode } from '../../common/utils/order-code.util';
-import { OrderService } from '../../common/enums/order.enum';
 
 @Injectable()
 export class OrdersCoreService {
@@ -19,8 +17,8 @@ export class OrdersCoreService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly broadcast: OrdersBroadcastService,
     private readonly logger: AppLoggerService,
+    private readonly broadcast: OrdersBroadcastService,
   ) {}
 
   async create(
@@ -42,19 +40,13 @@ export class OrdersCoreService {
             message: 'Tempat tujuan tidak ditemukan',
             error: '',
           },
+
           HttpStatus.BAD_REQUEST,
         );
       }
 
       const order = await this.prisma.order.create({
-        data: { ...dto, user_id: customerId },
-      });
-
-      const orderCode = generateOrderCode(OrderService.ride, order.id);
-
-      await this.prisma.order.update({
-        where: { id: order.id },
-        data: { order_code: orderCode },
+        data: { ...dto, customer_id: customerId, total_price: 5000 },
       });
 
       this.logger.log(
@@ -85,11 +77,18 @@ export class OrdersCoreService {
   async findAll(role: Role, userId: number): Promise<Order[]> {
     try {
       let where = {};
+
       if (role === Role.driver) {
-        where = { driver_id: userId };
+        where = {
+          OR: [
+            { driver_id: userId },
+            { status: OrderStatus.pending, driver_id: null },
+          ],
+        };
       } else if (role === Role.customer) {
         where = { user_id: userId };
       }
+
       const orders = await this.prisma.order.findMany({
         where,
         orderBy: { created_at: 'desc' },

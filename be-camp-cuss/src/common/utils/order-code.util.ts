@@ -6,8 +6,12 @@ export function generateOrderCode(
   orderId: number,
 ): string {
   const date = new Date();
+
   const datePart = date.toISOString().slice(2, 10).replace(/-/g, ''); // yyMMdd
+
   const randomPart = randomBytes(2).toString('hex').toUpperCase();
+
   const serviceCode = orderService.toUpperCase();
+
   return `CAMP-${serviceCode}-${orderId}-${datePart}-${randomPart}`;
 }

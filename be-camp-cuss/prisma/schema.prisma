@@ -33,7 +33,7 @@ model User {
 
   driverLocation            DriverLocation?
   driverRequests            DriverRequest[]
-  ordersAsCustomer          Order[]           @relation("UserOrders")
+  ordersAsCustomer          Order[]           @relation("CustomerOrders")
   ordersAsDriver            Order[]           @relation("DriverOrders")
   approvedDriverRequests    DriverRequest[]   @relation("AdminApprover")
 
@@ -72,8 +72,7 @@ model Destination {
 
 model Order {
   id                  Int            @id @default(autoincrement())
-  order_code          String?        @unique
-  user_id             Int
+  customer_id         Int
   driver_id           Int?
   destination_id      Int
   pick_up_location    String
@@ -86,15 +85,17 @@ model Order {
   created_at          DateTime       @default(now())
   updated_at          DateTime       @updatedAt
 
-  user                User           @relation("UserOrders", fields: [user_id], references: [id])
+  user                User           @relation("CustomerOrders", fields: [customer_id], references: [id])
   driver              User?          @relation("DriverOrders", fields: [driver_id], references: [id])
   destination         Destination    @relation(fields: [destination_id], references: [id])
+
+  transactions        Transaction[]  // kini satu order bisa punya banyak transaksi
 
   @@map("orders")
   @@index([status])
   @@index([payment_status])
   @@index([driver_id])
-  @@index([user_id])
+  @@index([customer_id])
 }
 
 model DriverLocation {
@@ -107,6 +108,30 @@ model DriverLocation {
   driver        User        @relation(fields: [driver_id], references: [id], onDelete: Cascade)
 
   @@map("driver_locations")
+}
+
+model Transaction {
+  id               Int             @id @default(autoincrement())
+  order_id         Int             
+  midtrans_order   String          @unique
+  transaction_id   String?         @unique
+  payment_type     String?
+  gross_amount     Float
+  qr_url           String?
+  deeplink_url     String?
+  expiry_time      DateTime?
+  fraud_status     String?
+  status           PaymentStatus   @default(pending)
+  settlement_time  DateTime?
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+
+  order            Order           @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+  @@index([order_id])
+  @@index([status])
+  @@index([payment_type])
 }
 
 enum UserRole {
@@ -139,4 +164,5 @@ enum PaymentStatus {
   paid
   failed
   refunded
+  expired
 }

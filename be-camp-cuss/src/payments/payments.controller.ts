@@ -1,34 +1,65 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { PaymentsService } from './payments.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { UpdatePaymentDto } from './dto/update-payment.dto';
+import {
+  Controller,
+  Post,
+  Param,
+  UseGuards,
+  Body,
+  ParseIntPipe,
+  Get,
+} from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { Public } from '../common/decorators/public.decorator';
+import { PaymentsCoreService } from './services/payments-core.service';
+import { MidtransCallbackDto } from './dto/midtrans-callback.dto';
 
 @Controller('payments')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(private readonly paymentsCoreService: PaymentsCoreService) {}
 
-  @Post()
-  create(@Body() createPaymentDto: CreatePaymentDto) {
-    return this.paymentsService.create(createPaymentDto);
+  @Post(':orderId')
+  @Roles(Role.driver)
+  async createPayment(@Param('orderId', ParseIntPipe) orderId: number) {
+    const payment = await this.paymentsCoreService.create(orderId);
+
+    return {
+      status: 'success',
+      message: 'Transaksi pembayaran berhasil dibuat',
+      data: payment,
+    };
+  }
+
+  @Public()
+  @Post('midtrans/callback')
+  async handleMidtransCallback(@Body() body: MidtransCallbackDto) {
+    await this.paymentsCoreService.handleCallback(body);
+
+    return {
+      status: 'success',
+      message: 'Callback diterima',
+    };
   }
 
   @Get()
-  findAll() {
-    return this.paymentsService.findAll();
-  }
+  @Roles(Role.admin)
+  async getAllPayments() {
+    const payments = await this.paymentsCoreService.getAll();
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.paymentsService.findOne(+id);
-  }
+    if (!payments || payments.length === 0) {
+      return {
+        status: 'success',
+        message: 'Tidak ada transaksi pembayaran ditemukan',
+        data: [],
+      };
+    }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
-    return this.paymentsService.update(+id, updatePaymentDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.paymentsService.remove(+id);
+    return {
+      status: 'success',
+      message: 'Daftar transaksi pembayaran berhasil diambil',
+      data: payments,
+    };
   }
 }
