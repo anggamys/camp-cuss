@@ -16,6 +16,11 @@ export class PaymentsCallbackService {
 
   async process(data: MidtransCallbackDto) {
     try {
+      this.logger.log(
+        `Menerima callback Midtrans - Order ID: ${data.order_id}, Transaction Status: ${data.transaction_status}, Payment Type: ${data.payment_type}`,
+        this.context,
+      );
+
       const tx = await this.prisma.transaction.findUnique({
         where: { midtrans_order: data.order_id },
         include: { order: true },
@@ -26,11 +31,17 @@ export class PaymentsCallbackService {
           `Transaksi ${data.order_id} tidak ditemukan atau sudah dihapus`,
           this.context,
         );
+
         throw new HttpException('Transaksi tidak ditemukan', 404);
       }
 
       const newStatus = MidtransHelpers.mapTransactionStatus(
         data.transaction_status,
+      );
+
+      this.logger.log(
+        `Memperbarui transaksi DB ID: ${tx.id}, Old Status: ${tx.status}, New Status: ${newStatus}, Fraud Status: ${data.fraud_status || 'N/A'}`,
+        this.context,
       );
 
       await this.prisma.transaction.update({
@@ -45,6 +56,11 @@ export class PaymentsCallbackService {
       });
 
       if ((newStatus as PaymentStatus) === PaymentStatus.paid) {
+        this.logger.log(
+          `Payment berhasil! Memperbarui Order #${tx.order_id} ke status completed`,
+          this.context,
+        );
+
         await this.prisma.order.update({
           where: { id: tx.order_id },
           data: {
@@ -55,7 +71,7 @@ export class PaymentsCallbackService {
       }
 
       this.logger.log(
-        `Callback: ${data.transaction_id} -> ${newStatus}`,
+        `Callback berhasil diproses - Transaction ID: ${data.transaction_id}, Order: ${data.order_id}, Final Status: ${newStatus}`,
         this.context,
       );
     } catch (error: any) {

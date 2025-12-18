@@ -62,4 +62,24 @@ export class PaymentsController {
       data: payments,
     };
   }
+
+  @Get(':midtransOrderId')
+  async getPaymentById(@Param('midtransOrderId') midtransOrderId: string) {
+    const payment =
+      await this.paymentsCoreService.getByMidtransId(midtransOrderId);
+
+    if (!payment) {
+      return {
+        status: 'success',
+        message: `Transaksi pembayaran dengan ID Midtrans ${midtransOrderId} tidak ditemukan`,
+        data: null,
+      };
+    }
+
+    return {
+      status: 'success',
+      message: 'Transaksi pembayaran berhasil diambil',
+      data: payment,
+    };
+  }
 }

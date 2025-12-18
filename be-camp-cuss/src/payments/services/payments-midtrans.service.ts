@@ -8,11 +8,14 @@ import type {
   TransactionResponseType,
   gopayTransactionResponseType,
 } from '../../common/types/transaction.interface';
-import { PaymentType } from '../../common/enums/transaction.enum';
+import {
+  PaymentStatus,
+  PaymentType,
+} from '../../common/enums/transaction.enum';
+import { OrderStatus } from '../../common/enums/order.enum';
 import { Env } from '../../common/constants/env.constant';
 import { generateOrderCode } from '../../common/utils/order-code.util';
 import { OrderService } from '../../common/enums/order.enum';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { MidtransHelpers } from '../../common/helpers/midtrans.helpers';
 
 @Injectable()
@@ -27,6 +30,11 @@ export class PaymentsMidtransService {
 
   async createTransaction(orderId: number): Promise<CreatePaymentResponseDto> {
     try {
+      this.logger.log(
+        `Memulai pembuatan transaksi untuk Order ID: ${orderId}`,
+        this.context,
+      );
+
       const order = await this.prismaService.order.findUnique({
         where: { id: orderId },
         include: { user: true },
@@ -37,8 +45,14 @@ export class PaymentsMidtransService {
           `Order dengan ID ${orderId} tidak ditemukan`,
           this.context,
         );
+
         throw new HttpException('Order tidak ditemukan', 404);
       }
+
+      this.logger.log(
+        `Order ditemukan: #${order.id}, User: ${order.user?.username}, Total: ${order.total_price}`,
+        this.context,
+      );
 
       // Cari transaksi aktif (pending/paid)
       const existingTransaction =
@@ -53,15 +67,20 @@ export class PaymentsMidtransService {
         });
 
       if (existingTransaction) {
+        this.logger.log(
+          `Ditemukan transaksi existing untuk Order #${orderId}: status=${existingTransaction.status}`,
+          this.context,
+        );
         // Tolak jika transaksi masih aktif
         if (
-          existingTransaction.status === PaymentStatus.pending ||
-          existingTransaction.status === PaymentStatus.paid
+          existingTransaction.status === PaymentStatus.pending.toString() ||
+          existingTransaction.status === PaymentStatus.paid.toString()
         ) {
           this.logger.warn(
             `Transaksi masih aktif untuk Order #${orderId} dengan status ${existingTransaction.status}`,
             this.context,
           );
+
           throw new HttpException(
             `Transaksi masih aktif (${existingTransaction.status}), tidak dapat membuat ulang`,
             400,
@@ -75,12 +94,18 @@ export class PaymentsMidtransService {
       const serviceFee = 2000;
       const updatedGrossAmount = order.total_price + midtransFee + serviceFee;
 
+      this.logger.log(
+        `Perhitungan biaya - Order: ${order.total_price}, Service Fee: ${serviceFee}, Midtrans Fee: ${midtransFee}, Total: ${updatedGrossAmount}`,
+        this.context,
+      );
+
       const transactionParams: gopayTransactionRequest = {
         paymentType: PaymentType.gopay,
         transactionDetails: {
           orderId: orderCode,
           grossAmount: updatedGrossAmount,
         },
+
         itemDetails: [
           {
             id: `order-${order.id}`,
@@ -101,11 +126,13 @@ export class PaymentsMidtransService {
             name: 'Midtrans Transaction Fee',
           },
         ],
+
         customerDetails: {
           firstName: order.user?.username ?? 'Customer',
           email: order.user?.email ?? '',
           phone: order.user?.no_phone ?? undefined,
         },
+
         gopay: {
           enableCallback: false,
           callbackUrl: Env.APP_URL ?? '',
@@ -113,11 +140,16 @@ export class PaymentsMidtransService {
       };
 
       // Kirim ke Midtrans
+      this.logger.log(
+        `Mengirim request ke Midtrans API untuk Order #${orderId}`,
+        this.context,
+      );
+
       const transactionResponse =
         await this.midtransService.createTransaction(transactionParams);
 
       this.logger.log(
-        `Transaksi Midtrans dibuat untuk Order #${orderId}`,
+        `Transaksi Midtrans berhasil dibuat - Order #${orderId}, Transaction ID: ${(transactionResponse as TransactionResponseType).transaction_id}, Status: ${(transactionResponse as TransactionResponseType).transaction_status}`,
         this.context,
       );
 
@@ -157,12 +189,20 @@ export class PaymentsMidtransService {
       if (!existingTransaction) {
         // Buat transaksi baru
         await this.prismaService.transaction.create({ data: trxData });
+        this.logger.log(
+          `Transaksi baru disimpan ke database untuk Order #${orderId}`,
+          this.context,
+        );
       } else {
         // Perbarui transaksi lama yang sudah gagal/refunded
         await this.prismaService.transaction.update({
           where: { id: existingTransaction.id },
           data: trxData,
         });
+        this.logger.log(
+          `Transaksi existing (ID: ${existingTransaction.id}) diperbarui untuk Order #${orderId}`,
+          this.context,
+        );
       }
 
       // Update order
@@ -173,6 +213,11 @@ export class PaymentsMidtransService {
           payment_method: PaymentType.gopay,
         },
       });
+
+      this.logger.log(
+        `Order #${order.id} diperbarui - Status: pending, Payment Method: gopay`,
+        this.context,
+      );
 
       const response: CreatePaymentResponseDto = {
         orderId: transactionParams.transactionDetails.orderId ?? '',

@@ -7,6 +7,7 @@ import { OrderStatus } from '../../common/enums/order.enum';
 
 @Injectable()
 export class OrdersBroadcastService implements OnModuleInit {
+  private readonly context = OrdersBroadcastService.name;
   private readonly activeIntervals = new Map<number, NodeJS.Timeout>();
 
   constructor(
@@ -23,7 +24,10 @@ export class OrdersBroadcastService implements OnModuleInit {
     if (pendingOrders.length === 0) return;
 
     await this.waitForGatewayReady();
-    this.logger.log(`Memulihkan ${pendingOrders.length} order pending`);
+    this.logger.log(
+      `Memulihkan ${pendingOrders.length} order pending`,
+      this.context,
+    );
 
     for (const order of pendingOrders) {
       this.broadcastAndSchedule(order.id, order);
@@ -37,14 +41,14 @@ export class OrdersBroadcastService implements OnModuleInit {
       retries++;
     }
     if (!this.gateway['serverReady']) {
-      this.logger.error('Gateway tidak siap setelah 5 detik');
+      this.logger.error('Gateway tidak siap setelah 5 detik', this.context);
     }
   }
 
   broadcastAndSchedule(orderId: number, order: Order): void {
     if (this.activeIntervals.has(orderId)) return;
 
-    this.logger.log(`Broadcast awal untuk order #${orderId}`);
+    this.logger.log(`Broadcast awal untuk order #${orderId}`, this.context);
     void this.gateway.broadcastNewOrderAvailable(order);
     this.startRebroadcastLoop(orderId);
   }
@@ -71,7 +75,7 @@ export class OrdersBroadcastService implements OnModuleInit {
     if (!order || order.status !== String(OrderStatus.pending)) {
       this.stopBroadcast(orderId);
 
-      this.logger.log(`Broadcast order #${orderId} dihentikan`);
+      this.logger.log(`Broadcast order #${orderId} dihentikan`, this.context);
 
       return;
     }

@@ -45,6 +45,11 @@ export class MidtransService {
     params: PaymentRequest | gopayTransactionRequest,
   ): Promise<TransactionResponseType | gopayTransactionResponseType> {
     try {
+      this.logger.log(
+        `Memulai pembuatan transaksi Midtrans - Order: ${params.transactionDetails.orderId}, Amount: ${params.transactionDetails.grossAmount}, Payment Type: ${params.paymentType}`,
+        this.context,
+      );
+
       const payload = {
         payment_type:
           params.paymentType === PaymentType.gopay
@@ -77,12 +82,17 @@ export class MidtransService {
           : {}),
       };
 
+      this.logger.log(
+        `Mengirim charge request ke Midtrans Core API - Order: ${payload.transaction_details.order_id}, Customer: ${payload.customer_details.first_name}`,
+        this.context,
+      );
+
       const transaction = (await this.coreApi.charge(payload)) as
         | TransactionResponseType
         | gopayTransactionResponseType;
 
       this.logger.log(
-        `Transaksi CoreAPI berhasil dibuat: ${params.transactionDetails.orderId}`,
+        `Transaksi CoreAPI berhasil dibuat - Order: ${params.transactionDetails.orderId}, Transaction ID: ${transaction.transaction_id}, Status: ${transaction.transaction_status}`,
         this.context,
       );
 
@@ -92,8 +102,9 @@ export class MidtransService {
         error instanceof Error ? error.message : JSON.stringify(error);
 
       this.logger.error(
-        `Kesalahan saat membuat transaksi CoreAPI: ${message}`,
+        `Kesalahan saat membuat transaksi CoreAPI - Order: ${params.transactionDetails.orderId}, Error: ${message}`,
         this.context,
+        error instanceof Error ? error.stack : undefined,
       );
 
       throw new InternalServerErrorException(message);
