@@ -14,17 +14,17 @@ export class AppLoggerService implements LoggerService {
 
   constructor(private readonly context: RequestContextService) {
     this.winston = createLogger({
-      level: process.env.LOG_LEVEL || 'info',
+      level: Env.APP_LOG_LEVEL || 'info',
       format: format.combine(
         format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
         format.errors({ stack: true }),
         format.splat(),
         format.printf((info) => {
           const timestamp = info.timestamp as string;
-          const level = info.level;
+          const level = info.level.toUpperCase();
           const message = info.message as string;
           const stack = info.stack as string | undefined;
-          return `${timestamp} [${level.toUpperCase().padEnd(5)}] ${message}${stack ? '\n' + stack : ''}`;
+          return `${timestamp} [${level.padEnd(5)}] ${message}${stack ? '\n' + stack : ''}`;
         }),
       ),
       transports: [
@@ -74,12 +74,12 @@ export class AppLoggerService implements LoggerService {
   }
 
   private enrich(message: string, context?: string): string {
-    const ctx = this.context.getAll();
+    const ctx = this.context.getAll() ?? null;
     // Use provided context, or fallback to caller context
-    const label = context || this.getCallerContext();
-    const prefix = [
+    const label: string | undefined = context || this.getCallerContext();
+    const prefix: string = [
       ctx?.requestId ? `[RID:${ctx.requestId}]` : '',
-      ctx?.userId ? `[UID:${ctx.userId}]` : '',
+      ctx?.userId ? `[UID:${String(ctx.userId)}]` : '',
       label ? `[${label}]` : '',
     ]
       .filter((item): item is string => Boolean(item))
@@ -91,10 +91,12 @@ export class AppLoggerService implements LoggerService {
     this.winston.info(this.enrich(message, context));
   }
 
-  error(message: string, trace?: string, context?: string) {
+  error(message: string, trace?: string | Error, context?: string) {
     const enrichedMessage = this.enrich(message, context);
     if (trace) {
-      this.winston.error(`${enrichedMessage}\n${trace}`);
+      const traceString =
+        trace instanceof Error ? trace.stack || trace.message : trace;
+      this.winston.error(`${enrichedMessage}\n${traceString}`);
     } else {
       this.winston.error(enrichedMessage);
     }

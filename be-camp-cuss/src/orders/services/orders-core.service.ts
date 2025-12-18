@@ -62,7 +62,9 @@ export class OrdersCoreService {
         this.broadcast.broadcastAndSchedule(order.id, order);
       }
 
-      return order as CreateOrderResponseDto;
+      const orderResp: CreateOrderResponseDto = { ...order };
+
+      return orderResp;
     } catch (e) {
       this.logger.error(
         `Gagal membuat pesanan untuk user ${customerId}`,
