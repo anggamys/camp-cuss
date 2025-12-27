@@ -12,7 +12,7 @@ import { UseGuards, UseInterceptors } from '@nestjs/common';
 import { SocketWithUser } from './types/socket-user.interface';
 import { OrderAvailableNotificationDto } from './dto/orders-notification.dto';
 import { ToggleOrderSubscriptionDto } from './dto/toggle-order-subs.dto';
-import { WsJwtGuard } from '../auth/guards/ws-jwt.guard';
+import { WsJwtGuard } from '../common/guards/ws-jwt.guard';
 import { WsTransformInterceptor } from '../common/interceptors/ws-transform.interceptor';
 import { AppLoggerService } from '../common/loggers/app-logger.service';
 

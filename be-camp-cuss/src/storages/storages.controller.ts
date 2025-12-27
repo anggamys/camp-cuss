@@ -11,11 +11,10 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { JwtAuthGuard } from '../auth/guards/jwt.guard';
+import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { User } from '../common/decorators/user.decorator';
 import { UsersUploadService } from '../users/services/users-upload.service';
 import { DestinationsService } from '../destinations/destinations.service';
-import { StoragesService } from './storages.service';
 import {
   UploadConfig,
   UploadResponse,
@@ -26,7 +25,6 @@ import {
 export class StoragesController {
   constructor(
     private readonly usersUpload: UsersUploadService,
-    private readonly storages: StoragesService,
     private readonly destinations: DestinationsService,
   ) {}
 

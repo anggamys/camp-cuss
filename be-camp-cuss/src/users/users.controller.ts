@@ -13,7 +13,7 @@ import { UsersService } from './services/users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ApproveDriverRequestDto } from './dto/approve-driver-request.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt.guard';
+import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { User } from '../common/decorators/user.decorator';
 import { UsersDriverRequestService } from './services/users-driver-request.service';
 import { Roles } from '../common/decorators/roles.decorator';
