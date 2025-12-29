@@ -8,7 +8,7 @@ import { PrismaErrorHelper } from '../../common/helpers/prisma-error.helper';
 import { StoragesService } from '../../storages/storages.service';
 import { StorageUrlHelper } from '../../common/helpers/storage-url.helper';
 import { UsersUploadService } from './users-upload.service';
-import { ValidationHelper } from '../../common/helpers/validation.helper';
+import { PrismaHelper } from '../../common/helpers/prisma.helper';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 @Injectable()
@@ -26,7 +26,7 @@ export class UsersService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly validationHelper: ValidationHelper,
+    private readonly prismaHelper: PrismaHelper,
     private readonly storages: StoragesService,
     private readonly usersUploadService: UsersUploadService,
     private readonly logger: AppLoggerService,
@@ -34,12 +34,8 @@ export class UsersService {
 
   async create(dto: CreateUserDto): Promise<CreateUserResponseDto> {
     try {
-      await this.validationHelper.assertUnique('user', 'email', dto.email);
-      await this.validationHelper.assertUnique(
-        'user',
-        'username',
-        dto.username,
-      );
+      await this.prismaHelper.assertUnique('user', 'email', dto.email);
+      await this.prismaHelper.assertUnique('user', 'username', dto.username);
       this.logger.debug(
         `Creating user: ${dto.email} / ${dto.username}`,
         this.context,

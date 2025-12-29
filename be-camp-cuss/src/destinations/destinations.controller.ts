@@ -1,3 +1,4 @@
+// src/destinations/destinations.controller.ts
 import {
   Controller,
   Get,
@@ -7,6 +8,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { DestinationsService } from './destinations.service';
 import { CreateDestinationDto } from './dto/create-destination.dto';
@@ -14,8 +16,13 @@ import { UpdateDestinationDto } from './dto/update-destination.dto';
 import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '../common/enums/role.enum';
 import { Public } from '../common/decorators/public.decorator';
+import { Role } from '../common/enums/role.enum';
+import { ApiQueryParams } from '../common/types/api-request.interface';
+import {
+  ApiResponse,
+  MetaResponse,
+} from '../common/types/api-response.interface';
 
 @Controller('destinations')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -25,53 +32,38 @@ export class DestinationsController {
 
   @Post()
   async create(@Body() dto: CreateDestinationDto) {
-    const destination = await this.destinationsService.create(dto);
-
-    return {
-      message: 'Destinasi berhasil dibuat',
-      data: destination,
-    };
+    const data = await this.destinationsService.create(dto);
+    return { message: 'Destinasi berhasil dibuat', data };
   }
 
   @Public()
   @Get()
-  async findAll() {
-    const destinations = await this.destinationsService.findAll();
+  async getAll(@Query() query: ApiQueryParams) {
+    const { data, meta } = await this.destinationsService.getAll(query);
 
     return {
-      message: 'Destinasi berhasil diambil',
-      data: destinations,
+      message: 'Daftar destinasi berhasil diambil',
+      data,
+      meta,
     };
   }
 
-  @Public()
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const destination = await this.destinationsService.findOne(+id);
+  // @Public()
+  // @Get(':id')
+  // async detail(@Param('id') id: string) {
+  //   const data = await this.service.detail(Number(id));
+  //   return { message: 'Destinasi berhasil diambil', data };
+  // }
 
-    return {
-      message: 'Destinasi berhasil diambil',
-      data: destination,
-    };
-  }
+  // @Patch(':id')
+  // async update(@Param('id') id: string, @Body() dto: UpdateDestinationDto) {
+  //   const data = await this.service.update(Number(id), dto);
+  //   return { message: 'Destinasi berhasil diperbarui', data };
+  // }
 
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateDestinationDto) {
-    const updated = await this.destinationsService.update({ ...dto, id: +id });
-
-    return {
-      message: 'Destinasi berhasil diperbarui',
-      data: updated,
-    };
-  }
-
-  @Delete(':id')
-  async remove(@Param('id') id: string) {
-    const result = await this.destinationsService.remove(+id);
-
-    return {
-      message: 'Destinasi berhasil dihapus',
-      data: result,
-    };
-  }
+  // @Delete(':id')
+  // async remove(@Param('id') id: string) {
+  //   const message = await this.service.remove(Number(id));
+  //   return { message };
+  // }
 }

@@ -13,7 +13,7 @@ import {
 import { RegisterDto, RegisterUserResponseDto } from './dto/register.dto';
 import { PasswordHelper } from '../common/helpers/password.helper';
 import { TokenHelper } from '../common/helpers/token.helper';
-import { ValidationHelper } from '../common/helpers/validation.helper';
+import { PrismaHelper } from '../common/helpers/prisma.helper';
 import { AppLoggerService } from '../common/loggers/app-logger.service';
 import { TokenStoreHelper } from '../common/helpers/token-store.helper';
 
@@ -26,14 +26,14 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly logger: AppLoggerService,
-    private readonly validation: ValidationHelper,
+    private readonly prismaHelper: PrismaHelper,
     private readonly tokenStore: TokenStoreHelper,
   ) {}
 
   async register(dto: RegisterDto): Promise<RegisterUserResponseDto> {
     this.logger.log(`Register user: ${dto.email}`);
-    await this.validation.assertUnique('user', 'email', dto.email);
-    await this.validation.assertUnique('user', 'username', dto.username);
+    await this.prismaHelper.assertUnique('user', 'email', dto.email);
+    await this.prismaHelper.assertUnique('user', 'username', dto.username);
 
     const hashed = await PasswordHelper.hash(dto.password);
 
