@@ -29,8 +29,12 @@ export class PrismaHelper {
       | undefined;
 
     if (!repo || typeof repo.findMany !== 'function') {
-      this.logger.error(`Model "${String(model)}" tidak valid untuk findMany`);
-      throw new Error(`Model "${String(model)}" tidak valid untuk findMany`);
+      this.logger.error(
+        `Model "${String(model)}" tidak valid untuk operasi findMany.`,
+      );
+      throw new Error(
+        `Model "${String(model)}" tidak valid untuk operasi findMany.`,
+      );
     }
 
     try {
@@ -39,11 +43,11 @@ export class PrismaHelper {
         skip: options?.skip ?? 0,
         select: options?.select,
         where: options?.where,
-        orderBy: options?.orderBy ?? { createdAt: 'desc' },
+        orderBy: options?.orderBy ?? { created_at: 'desc' },
       })) as T[];
     } catch (err) {
       this.logger.error(
-        `Prisma findAllRecords error on model "${String(model)}": ${
+        `Terjadi kesalahan saat mengambil data dari model "${String(model)}": ${
           err && typeof err === 'object' && err !== null && 'message' in err
             ? (err as { message: string }).message
             : String(err)
@@ -58,7 +62,9 @@ export class PrismaHelper {
       );
 
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        throw new BadRequestException(`Kesalahan Prisma: ${err.message}`);
+        throw new BadRequestException(
+          `Terjadi kesalahan pada Prisma: ${err.message}`,
+        );
       }
 
       throw err;
@@ -81,10 +87,12 @@ export class PrismaHelper {
       typeof repo.findUnique !== 'function'
     ) {
       this.logger.error(
-        `Model "${String(model)}" bukan model Prisma yang valid`,
+        `Model "${String(model)}" bukan model Prisma yang valid.`,
       );
 
-      throw new Error(`Model "${String(model)}" bukan model Prisma yang valid`);
+      throw new Error(
+        `Model "${String(model)}" bukan model Prisma yang valid.`,
+      );
     }
 
     try {
@@ -93,7 +101,7 @@ export class PrismaHelper {
       } as any)) as T | null;
     } catch (err) {
       this.logger.error(
-        `Prisma findRecord error on model "${String(model)}", field "${String(field)}", value "${value}": ${
+        `Terjadi kesalahan saat mencari data pada model "${String(model)}", field "${String(field)}", value "${value}": ${
           err && typeof err === 'object' && err !== null && 'message' in err
             ? (err as { message: string }).message
             : String(err)
@@ -108,7 +116,9 @@ export class PrismaHelper {
       );
 
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        throw new BadRequestException(`Kesalahan query Prisma: ${err.message}`);
+        throw new BadRequestException(
+          `Terjadi kesalahan pada query Prisma: ${err.message}`,
+        );
       }
 
       throw err;
@@ -124,12 +134,12 @@ export class PrismaHelper {
 
     if (record) {
       this.logger.warn(
-        `assertUnique failed: ${field} dengan value "${value}" sudah terdaftar pada model "${String(model)}"`,
+        `Validasi gagal: Nilai "${value}" pada field "${field}" sudah terdaftar di model "${String(model)}".`,
       );
-
       throw new BadRequestException({
-        message: message ?? `${field} sudah digunakan`,
-        errors: { [field]: `${value} sudah terdaftar` },
+        message:
+          message ?? `Nilai "${value}" pada field "${field}" sudah digunakan.`,
+        errors: { [field]: `Nilai "${value}" sudah digunakan.` },
       });
     }
   }
@@ -143,12 +153,14 @@ export class PrismaHelper {
 
     if (!record) {
       this.logger.warn(
-        `assertExists failed: ${field} dengan value "${value}" tidak ditemukan pada model "${String(model)}"`,
+        `Validasi gagal: Data dengan "${field}" bernilai "${value}" tidak ditemukan di model "${String(model)}".`,
       );
 
       throw new NotFoundException({
-        message: message ?? `${field} tidak ditemukan`,
-        errors: { [field]: `${value} tidak ditemukan` },
+        message:
+          message ??
+          `Data dengan "${field}" bernilai "${value}" tidak ditemukan.`,
+        errors: { [field]: `Data tidak ditemukan.` },
       });
     }
   }

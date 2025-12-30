@@ -1,4 +1,3 @@
-// src/destinations/destinations.controller.ts
 import {
   Controller,
   Get,
@@ -19,10 +18,6 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { Role } from '../common/enums/role.enum';
 import { ApiQueryParams } from '../common/types/api-request.interface';
-import {
-  ApiResponse,
-  MetaResponse,
-} from '../common/types/api-response.interface';
 
 @Controller('destinations')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -48,22 +43,24 @@ export class DestinationsController {
     };
   }
 
-  // @Public()
-  // @Get(':id')
-  // async detail(@Param('id') id: string) {
-  //   const data = await this.service.detail(Number(id));
-  //   return { message: 'Destinasi berhasil diambil', data };
-  // }
+  @Get(':id')
+  async getOne(@Param('id') id: string) {
+    const data = await this.destinationsService.getById(Number(id));
 
-  // @Patch(':id')
-  // async update(@Param('id') id: string, @Body() dto: UpdateDestinationDto) {
-  //   const data = await this.service.update(Number(id), dto);
-  //   return { message: 'Destinasi berhasil diperbarui', data };
-  // }
+    return { message: 'Detail destinasi berhasil diambil', data };
+  }
 
-  // @Delete(':id')
-  // async remove(@Param('id') id: string) {
-  //   const message = await this.service.remove(Number(id));
-  //   return { message };
-  // }
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() dto: UpdateDestinationDto) {
+    const data = await this.destinationsService.update(Number(id), dto);
+
+    return { message: 'Destinasi berhasil diperbarui', data };
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    const message = await this.destinationsService.delete(Number(id));
+
+    return { message };
+  }
 }

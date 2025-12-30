@@ -115,6 +115,51 @@ export class DestinationsService {
     }
   }
 
+  async update(
+    id: number,
+    dto: Partial<CreateDestinationDto>,
+  ): Promise<Destination> {
+    try {
+      const destination: Destination | null =
+        await this.prismaHelper.findRecord('destination', 'id', id);
+
+      if (!destination) {
+        throw new HttpException('Destinasi tidak ditemukan', 404);
+      }
+
+      if (dto.name && dto.name !== destination.name) {
+        await this.prismaHelper.assertUnique(
+          'destination',
+          'name',
+          dto.name,
+          'Nama destinasi sudah digunakan',
+        );
+      }
+
+      const updatedDestination = await this.prisma.destination.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          estimated: dto.estimated,
+        },
+      });
+
+      this.logger.debug(
+        `Destinasi dengan ID: ${updatedDestination.id} berhasil diperbarui`,
+        this.context,
+      );
+
+      return updatedDestination;
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+
+      throw new HttpException(
+        'Terjadi kesalahan saat memperbarui destinasi',
+        500,
+      );
+    }
+  }
+
   async delete(id: number): Promise<void> {
     try {
       const destination: Destination | null =
