@@ -19,6 +19,7 @@ import { CommonModule } from './common/common.module';
 import { DriverLocationsModule } from './driver-locations/driver-locations.module';
 import { RedisModule } from './common/redis';
 import { PaymentsModule } from './payments/payments.module';
+import { ChatsModule } from './chats/chats.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { PaymentsModule } from './payments/payments.module';
     DriverLocationsModule,
     RedisModule,
     PaymentsModule,
+    ChatsModule,
   ],
   controllers: [],
   providers: [
