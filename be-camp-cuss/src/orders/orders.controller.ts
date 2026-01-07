@@ -53,16 +53,21 @@ export class OrdersController {
     @User('userId') userId: number,
     @Query() query: ApiQueryParams,
   ) {
-    const { data: orders, meta } = await this.ordersCore.findAll(
-      role,
-      userId,
-      query,
-    );
+    const { data, meta } = await this.ordersCore.findAll(role, userId, query);
+
+    if (data.length === 0) {
+      return {
+        status: 'success',
+        message: 'Tidak ada pesanan ditemukan',
+        data: [],
+        meta,
+      };
+    }
 
     return {
       status: 'success',
-      message: 'Daftar pesanan berhasil diambil',
-      data: orders,
+      message: 'Daftar pesanan berhasil ditemukan',
+      data,
       meta,
     };
   }

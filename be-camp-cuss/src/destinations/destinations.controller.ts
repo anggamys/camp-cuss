@@ -43,6 +43,7 @@ export class DestinationsController {
     };
   }
 
+  @Public()
   @Get(':id')
   async getOne(@Param('id') id: string) {
     const data = await this.destinationsService.getById(Number(id));

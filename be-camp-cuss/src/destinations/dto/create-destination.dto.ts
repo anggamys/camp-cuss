@@ -17,8 +17,8 @@ export class CreateDestinationDto {
   estimated: number;
 
   @IsOptional()
-  @IsString({ message: 'image_place harus berupa string' })
-  image_place: string | null;
+  @IsString({ message: 'imagePlace harus berupa string' })
+  imagePlace: string | null;
 }
 
 export class responseCreateDestinationDto {
@@ -30,8 +30,8 @@ export class responseCreateDestinationDto {
   name: string;
 
   @IsOptional()
-  @IsString({ message: 'image_place harus berupa string' })
-  image_place: string | null;
+  @IsString({ message: 'imagePlace harus berupa string' })
+  imagePlace: string | null;
 
   @IsNumber({}, { message: 'estimated harus berupa angka' })
   @Min(0, { message: 'estimated harus bernilai minimal 0' })

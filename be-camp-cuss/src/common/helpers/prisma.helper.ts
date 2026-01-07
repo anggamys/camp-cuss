@@ -9,6 +9,8 @@ import { AppLoggerService } from '../loggers/app-logger.service';
 
 @Injectable()
 export class PrismaHelper {
+  private readonly context = PrismaHelper.name;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: AppLoggerService,
@@ -20,108 +22,101 @@ export class PrismaHelper {
       take?: number;
       skip?: number;
       select?: Record<string, any>;
+      include?: Record<string, any>;
       where?: Record<string, any>;
       orderBy?: Record<string, 'asc' | 'desc'>;
-      include?: Record<string, any>;
       search?: {
-        fields?: string[]; // Support multiple fields
         query: string;
-        mode?: 'default' | 'insensitive';
-        relation?: string;
-        relationFields?: string[]; // Support multiple relation fields
+        numericFields?: string[];
+        stringFields?: string[];
+        relations?: {
+          name: string;
+          stringFields: string[];
+        }[];
       };
     },
   ): Promise<T[]> {
     const repo = this.prisma[model] as
-      | { findMany?: (args?: any) => Promise<any[]> }
+      | { findMany: (args: any) => Promise<any[]> }
       | undefined;
 
-    if (!repo || typeof repo.findMany !== 'function') {
-      this.logger.error(
-        `Model "${String(model)}" tidak valid untuk operasi findMany.`,
-      );
-
-      throw new Error(
-        `Model "${String(model)}" tidak valid untuk operasi findMany.`,
-      );
+    if (!repo) {
+      throw new Error(`Model "${String(model)}" tidak valid`);
     }
 
     try {
       let where = options?.where ? { ...options.where } : {};
+      let or: any[] = [];
 
-      // Support search in multiple columns and relation fields
-      if (options?.search && options.search.query) {
-        const searchMode = options.search.mode || 'insensitive';
-        const searchQuery = options.search.query;
+      if (options?.search?.query) {
+        const q = options.search.query;
+        const isNumeric = !isNaN(Number(q));
 
-        const or: any[] = [];
-
-        // Search in direct fields
-        if (options.search.fields && Array.isArray(options.search.fields)) {
-          for (const field of options.search.fields) {
-            or.push({
-              [field]: {
-                contains: searchQuery,
-                mode: searchMode,
-              },
-            });
-          }
+        // Numeric search
+        if (isNumeric && Array.isArray(options.search.numericFields)) {
+          or = or.concat(
+            options.search.numericFields.map((field) => ({
+              [field]: Number(q),
+            })),
+          );
         }
 
-        // Search in relation fields
-        if (
-          options.search.relation &&
-          options.search.relationFields &&
-          Array.isArray(options.search.relationFields)
-        ) {
-          for (const relField of options.search.relationFields) {
-            or.push({
-              [options.search.relation]: {
-                [relField]: {
-                  contains: searchQuery,
-                  mode: searchMode,
-                },
-              },
-            });
+        // Relation string search
+        if (Array.isArray(options.search.relations)) {
+          for (const rel of options.search.relations) {
+            if (Array.isArray(rel.stringFields)) {
+              or = or.concat(
+                rel.stringFields.map((field) => ({
+                  [rel.name]: {
+                    [field]: {
+                      contains: q,
+                      mode: 'insensitive',
+                    },
+                  },
+                })),
+              );
+            }
           }
         }
 
         if (or.length > 0) {
-          where = {
-            ...where,
-            OR: or,
-          };
+          where =
+            Object.keys(where).length > 0
+              ? { AND: [where, { OR: or }] }
+              : { OR: or };
         }
       }
 
-      return (await repo.findMany({
+      this.logger.debug(
+        `FindAllRecords: model=${String(model)}, where=${JSON.stringify(where)}`,
+        this.context,
+      );
+
+      const result = await repo.findMany({
         take: options?.take ?? 10,
         skip: options?.skip ?? 0,
         select: options?.select,
         include: options?.include,
         where,
-        orderBy: options?.orderBy ?? { created_at: 'desc' },
-      })) as T[];
+        orderBy: options?.orderBy ?? { id: 'desc' },
+      });
+
+      this.logger.debug(
+        `FindAllRecords: returned ${Array.isArray(result) ? result.length : 0} records`,
+        this.context,
+      );
+
+      return result as T[];
     } catch (err) {
       this.logger.error(
-        `Terjadi kesalahan saat mengambil data dari model "${String(model)}": ${
-          err && typeof err === 'object' && err !== null && 'message' in err
-            ? (err as { message: string }).message
-            : String(err)
+        `Prisma error pada model "${String(model)}": ${
+          err instanceof Error ? err.message : String(err)
         }`,
-        err &&
-          typeof err === 'object' &&
-          err !== null &&
-          'stack' in err &&
-          typeof (err as Record<string, unknown>).stack === 'string'
-          ? (err as { stack: string }).stack
-          : undefined,
+        err instanceof Error ? err.stack : undefined,
       );
 
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        throw new BadRequestException(
-          `Terjadi kesalahan pada Prisma: ${err.message}`,
-        );
+        throw new BadRequestException(err.message);
       }
 
       throw err;

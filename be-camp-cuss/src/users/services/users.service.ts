@@ -62,19 +62,38 @@ export class UsersService {
     query: ApiQueryParams,
   ): Promise<{ data: FindUserResponseDto[]; meta: MetaResponse }> {
     try {
+      let where = {};
+
       const page = Number(query.page) || 1;
       const limit = Number(query.limit) || 10;
       const skip = (page - 1) * limit;
+
+      const search = query.search
+        ? ({
+            fields: ['username', 'email', 'no_phone'],
+            query: String(query.search),
+            mode: 'insensitive',
+          } as const)
+        : undefined;
+
+      if (search) {
+        where = {
+          OR: search.fields.map((field) => ({
+            [field]: { contains: search.query, mode: search.mode },
+          })),
+        };
+      }
 
       const [rawData, totalData] = await Promise.all([
         this.prismaHelper.findAllRecords('user', {
           take: limit,
           skip: skip,
+          where,
           orderBy: {
             [query.sortBy || 'created_at']: query.sortOrder || 'desc',
           },
         }),
-        this.prisma.user.count(),
+        this.prisma.user.count({ where }),
       ]);
 
       if (rawData.length === 0) {
@@ -113,6 +132,7 @@ export class UsersService {
         this.context,
         'Gagal mengambil daftar pengguna',
       );
+      throw err;
     }
   }
 

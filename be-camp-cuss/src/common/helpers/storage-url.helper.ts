@@ -52,8 +52,20 @@ export class StorageUrlHelper {
       try {
         if (this.isPublicField(field)) {
           result[field] = this.storages.buildPublicUrl(value);
+
+          this.logger.debug(
+            `URL publik untuk field ${field} dibangun: ${String(result[field])}`,
+            this.loggerContext,
+          );
         } else if (this.isPrivateField(field)) {
           result[field] = await this.storages.createSignedUrl(value);
+
+          this.logger.debug(
+            `URL privat untuk field ${field} dibangun: ${String(
+              result[field],
+            )}`,
+            this.loggerContext,
+          );
         }
       } catch (err) {
         this.logger.error(

@@ -11,6 +11,8 @@ import { Destination } from '@prisma/client';
 import { ApiQueryParams } from '../common/types/api-request.interface';
 import { MetaResponse } from '../common/types/api-response.interface';
 import { ErrorHelper } from '../common/helpers/error.helper';
+import { StorageUrlHelper } from '../common/helpers/storage-url.helper';
+import { FindDestinationResponseDto } from './dto/find-destination.dto';
 
 @Injectable()
 export class DestinationsService {
@@ -38,6 +40,7 @@ export class DestinationsService {
         data: {
           name: dto.name,
           estimated: dto.estimated,
+          image_place: dto.imagePlace,
         },
       });
 
@@ -49,56 +52,81 @@ export class DestinationsService {
       return {
         id: newDestination.id,
         name: newDestination.name,
-        image_place: newDestination.image_place,
+        imagePlace: newDestination.image_place,
         estimated: newDestination.estimated,
         created_at: newDestination.created_at,
         updated_at: newDestination.updated_at,
       };
-    } catch (err: any) {
-      if (err instanceof HttpException) throw err;
-
-      throw new HttpException('Terjadi kesalahan saat membuat destinasi', 500);
+    } catch (err) {
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        'Gagal menyimpan data destinasi',
+      );
     }
   }
 
   async getAll(
     query: ApiQueryParams,
-  ): Promise<{ data: Destination[]; meta: MetaResponse }> {
+  ): Promise<{ data: FindDestinationResponseDto[]; meta: MetaResponse }> {
     try {
+      let where = {};
+
       const page = Number(query.page) || 1;
       const limit = Number(query.limit) || 10;
       const skip = (page - 1) * limit;
 
       const search = query.search
         ? ({
-            field: 'name',
+            fields: ['name'],
             query: String(query.search),
             mode: 'insensitive',
           } as const)
         : undefined;
 
+      if (search) {
+        where = {
+          OR: search.fields.map((field) => ({
+            [field]: { contains: search.query, mode: search.mode },
+          })),
+        };
+      }
+
       const [rawData, total] = await Promise.all([
         this.prismaHelper.findAllRecords('destination', {
           take: limit,
           skip,
-          search,
+          where,
           orderBy: {
             [query.sortBy || 'created_at']: query.sortOrder || 'desc',
           },
         }),
+
         search
           ? this.prisma.destination.count({
-              where: {
-                [search.field]: {
-                  contains: search.query,
-                  mode: search.mode,
-                },
-              },
+              where,
             })
           : this.prisma.destination.count(),
       ]);
 
-      const data: Destination[] = rawData as Destination[];
+      const storageHelper = StorageUrlHelper.create(
+        this.storageService,
+        this.logger,
+      );
+
+      const destinationsWithUrls = await storageHelper.buildFileUrlsForArray(
+        rawData as Destination[],
+      );
+
+      const data: FindDestinationResponseDto[] = (
+        destinationsWithUrls as Destination[]
+      ).map((item) => ({
+        id: item.id,
+        name: item.name,
+        imagePlace: item.image_place ?? '',
+        estimatedTime: item.estimated,
+      }));
 
       const meta: MetaResponse = {
         total,

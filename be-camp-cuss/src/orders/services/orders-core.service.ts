@@ -89,74 +89,64 @@ export class OrdersCoreService {
       let where = {};
 
       if (role === Role.driver) {
-        where = {
-          OR: [
-            { driver_id: userId },
-            { status: OrderStatus.pending, driver_id: null },
-          ],
-        };
-      } else if (role === Role.customer) {
+        where = { driver_id: userId };
+      }
+      if (role === Role.customer) {
         where = { customer_id: userId };
       }
 
-      const page = query.page || 1;
-      const limit = query.limit || 10;
+      const page =
+        Number.isInteger(Number(query.page)) && Number(query.page) > 0
+          ? Number(query.page)
+          : 1;
+
+      const limit =
+        Number.isInteger(Number(query.limit)) && Number(query.limit) > 0
+          ? Number(query.limit)
+          : 10;
+
       const skip = (page - 1) * limit;
 
       const search = query.search
-        ? ({
-            fields: ['id'],
+        ? {
             query: String(query.search),
-            mode: 'insensitive',
-            relation: 'user',
-            relationFields: ['username', 'email'],
-          } as const)
+            numericFields: ['id'],
+            relations: [
+              { name: 'customer', stringFields: ['username', 'email'] },
+              { name: 'driver', stringFields: ['username', 'email'] },
+            ],
+          }
         : undefined;
 
-      if (search) {
-        where = {
-          ...where,
-          OR: search.fields.map((field) => ({
-            [field]: {
-              contains: search.query,
-              mode: search.mode,
-            },
-          })),
-        };
-      }
+      this.logger.debug(
+        `FindAllOrders: role=${role}, userId=${userId}, page=${page}, limit=${limit}, search=${JSON.stringify(
+          search,
+        )}, where=${JSON.stringify(where)}`,
+        this.context,
+      );
 
       const [rawData, total] = await Promise.all([
         this.prismaHelper.findAllRecords('order', {
           where,
-          orderBy: { created_at: 'desc' },
           skip,
           take: limit,
           include: { customer: true, driver: true },
+          search,
         }),
         this.prisma.order.count({ where }),
       ]);
 
-      this.logger.debug(
-        `Mengambil ${rawData.length} pesanan dari database untuk role ${role} (userId: ${userId})`,
-        this.context,
-      );
-
-      const orders: FindOrderResponseDto[] = rawData.map(
-        (
-          order: Order & {
-            customer: User;
-            driver?: User | null;
-          },
-        ) => ({
+      const data: FindOrderResponseDto[] = rawData.map(
+        (order: Order & { customer: User | null; driver: User | null }) => ({
           id: order.id,
+          driverId: order.driver_id === null ? 0 : order.driver_id,
           customerId: order.customer_id,
-          driverId: order.driver_id ?? 0,
           destinationId: order.destination_id,
-          pickupLocation: order.pick_up_location,
-          pickupLatitude: order.pick_up_latitude,
-          pickupLongitude: order.pick_up_longitude,
           totalPrice: order.total_price,
           status: order.status,
+          pickupLatitude: order.pick_up_latitude,
+          pickupLongitude: order.pick_up_longitude,
+          pickupLocation: order.pick_up_location,
           createdAt:
             order.created_at instanceof Date
               ? order.created_at.getTime()
@@ -166,33 +156,26 @@ export class OrdersCoreService {
               ? order.updated_at.getTime()
               : order.updated_at,
           customerInfo: {
-            id: order.customer.id,
-            username: order.customer.username,
-            email: order.customer.email,
-            noPhone: order.customer.no_phone ?? '',
+            id: order.customer?.id ?? 0,
+            username: order.customer?.username ?? '',
+            email: order.customer?.email ?? '',
+            noPhone: order.customer?.no_phone ?? '',
           },
-          driverInfo: order.driver
-            ? {
-                id: order.driver.id,
-                username: order.driver.username,
-                email: order.driver.email,
-                noPhone: order.driver.no_phone,
-              }
-            : {
-                id: 0,
-                username: '',
-                email: '',
-                noPhone: '',
-              },
+          driverInfo: {
+            id: order.driver?.id ?? 0,
+            username: order.driver?.username ?? '',
+            email: order.driver?.email ?? '',
+            noPhone: order.driver?.no_phone ?? '',
+          },
         }),
       );
 
       return {
-        data: orders,
+        data,
         meta: {
           page,
-          total,
           per_page: limit,
+          total,
           last_page: Math.ceil(total / limit),
         },
       };
