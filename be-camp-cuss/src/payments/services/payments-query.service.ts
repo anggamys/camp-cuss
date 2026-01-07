@@ -6,6 +6,11 @@ import {
   PaymentStatus,
   PaymentType,
 } from '../../common/enums/transaction.enum';
+import { ApiQueryParams } from '../../common/types/api-request.interface';
+import { MetaResponse } from '../../common/types/api-response.interface';
+import { ErrorHelper } from '../../common/helpers/error.helper';
+import { PrismaHelper } from '../../common/helpers/prisma.helper';
+import { Transaction } from '@prisma/client';
 
 @Injectable()
 export class PaymentsQueryService {
@@ -13,23 +18,41 @@ export class PaymentsQueryService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly prismaHelper: PrismaHelper,
     private readonly logger: AppLoggerService,
   ) {}
 
-  async getAll(): Promise<FindPaymentResponseDto[]> {
+  async getAll(
+    query: ApiQueryParams,
+  ): Promise<{ data: FindPaymentResponseDto[]; meta: MetaResponse }> {
     try {
-      this.logger.log('Mengambil semua transaksi', this.context);
+      const page = Number(query.page) || 1;
+      const limit = Number(query.limit) || 10;
+      const offset = (page - 1) * limit;
 
-      const transactions = await this.prisma.transaction.findMany({
-        include: { order: true },
-      });
+      const search = query.search
+        ? ({
+            field: 'midtrans_order',
+            query: String(query.search),
+            mode: 'insensitive',
+          } as const)
+        : undefined;
 
-      this.logger.log(
-        `Berhasil mengambil ${transactions.length} transaksi`,
-        this.context,
-      );
+      const [rawData, total] = await Promise.all([
+        this.prismaHelper.findAllRecords('transaction', {
+          take: limit,
+          skip: offset,
+          search,
+          orderBy: {
+            [query.sortBy || 'created_at']: query.sortOrder || 'desc',
+          },
+        }),
+        this.prismaHelper.countRecords('transaction'),
+      ]);
 
-      return transactions.map((transaction) => ({
+      const rawDataData = rawData as Transaction[];
+
+      const data: FindPaymentResponseDto[] = rawDataData.map((transaction) => ({
         id: transaction.id,
         orderId: transaction.order_id,
         midtransOrderId: transaction.midtrans_order,
@@ -46,14 +69,27 @@ export class PaymentsQueryService {
         createdAt: transaction.created_at,
         updatedAt: transaction.updated_at,
       }));
-    } catch (error) {
-      this.logger.error(
-        'Terjadi kesalahan saat mengambil semua transaksi',
+
+      const meta: MetaResponse = {
+        page,
+        perPage: limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      };
+
+      this.logger.log(
+        `Mengambil semua transaksi - Page: ${page}, Limit: ${limit}`,
         this.context,
-        error instanceof Error ? error.message : String(error),
       );
 
-      throw error;
+      return { data, meta };
+    } catch (err) {
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        'Terjadi kesalahan saat mengambil semua transaksi',
+      );
     }
   }
 

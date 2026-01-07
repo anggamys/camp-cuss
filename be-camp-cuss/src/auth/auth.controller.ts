@@ -46,7 +46,7 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
-  async logout(@User('id') userId: number, @Req() request: Request) {
+  async logout(@User('userId') userId: number, @Req() request: Request) {
     const authHeader = request.headers.authorization;
     const token = authHeader?.replace('Bearer ', '');
 

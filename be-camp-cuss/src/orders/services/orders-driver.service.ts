@@ -1,9 +1,11 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
-import { PrismaErrorHelper } from '../../common/helpers/prisma-error.helper';
 import { Order, UserRole } from '@prisma/client';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 import { OrderStatus } from '../../common/enums/order.enum';
+import { ErrorHelper } from '../../common/helpers/error.helper';
+import { PrismaHelper } from '../../common/helpers/prisma.helper';
+import { ChatsService } from '../../chats/chats.service';
 
 @Injectable()
 export class OrdersDriverService {
@@ -11,15 +13,12 @@ export class OrdersDriverService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly prismaHelper: PrismaHelper,
+    private readonly chatsService: ChatsService,
     private readonly logger: AppLoggerService,
   ) {}
 
   async acceptOrder(orderId: number, driverId: number): Promise<Order> {
-    this.logger.debug(
-      `Driver ${driverId} mencoba menerima pesanan #${orderId}`,
-      this.context,
-    );
-
     try {
       return await this.prisma.$transaction(async (tx) => {
         const [order, driver] = await Promise.all([
@@ -96,21 +95,20 @@ export class OrdersDriverService {
           where: { id: orderId },
         });
 
+        await this.chatsService.createChatRoom({
+          orderId: orderId,
+          userIds: [driverId, order.customer_id],
+        });
+
         return updatedOrder!;
       });
-    } catch (e) {
-      if (!(e instanceof HttpException)) {
-        this.logger.error(
-          `Kesalahan tak terduga saat menerima pesanan #${orderId} oleh driver ${driverId}`,
-          e instanceof Error ? e.stack : String(e),
-          this.context,
-        );
-
-        PrismaErrorHelper.handle(e);
-      } else {
-        this.logger.warn(`Operasi dibatalkan: ${e.message}`, this.context);
-      }
-      throw e;
+    } catch (err) {
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        `Gagal menerima pesanan #${orderId} oleh driver ${driverId}`,
+      );
     }
   }
 
@@ -148,6 +146,8 @@ export class OrdersDriverService {
         data: { status: OrderStatus.completed },
       });
 
+      await this.chatsService.closeChatRoom(orderId);
+
       this.logger.log(
         `Driver ${driverId} menyelesaikan pesanan #${orderId}`,
         this.context,
@@ -155,15 +155,12 @@ export class OrdersDriverService {
 
       return updated;
     } catch (e) {
-      this.logger.error(
-        `Gagal menyelesaikan pesanan #${orderId} oleh driver ${driverId}`,
-        e instanceof Error ? e.stack : String(e),
+      ErrorHelper.handle(
+        e,
+        this.logger,
         this.context,
+        `Gagal menyelesaikan pesanan #${orderId} oleh driver ${driverId}`,
       );
-
-      if (e instanceof HttpException) throw e;
-
-      PrismaErrorHelper.handle(e);
     }
   }
 }

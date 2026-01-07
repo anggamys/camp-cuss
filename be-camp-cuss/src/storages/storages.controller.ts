@@ -31,9 +31,9 @@ export class StoragesController {
   @Post('users/:id/upload/:type')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async uploadUserFile(
-    @User('id') accessUserId: number,
-    @Param('id', ParseIntPipe) id: number,
     @Param('type') type: string,
+    @User('userId') accessUserId: number,
+    @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<UploadResponse> {
     if (accessUserId !== id)

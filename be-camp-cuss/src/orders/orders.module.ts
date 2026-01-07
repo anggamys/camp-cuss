@@ -6,9 +6,10 @@ import { OrdersNotificationsModule } from '../orders-notifications/orders-notifi
 import { OrdersBroadcastService } from './services/orders-broadcast.service';
 import { OrdersDriverService } from './services/orders-driver.service';
 import { OrdersCustomerService } from './services/orders-customer.service';
+import { ChatsModule } from '../chats/chats.module';
 
 @Module({
-  imports: [PrismaModule, OrdersNotificationsModule],
+  imports: [PrismaModule, OrdersNotificationsModule, ChatsModule],
   controllers: [OrdersController],
   providers: [
     OrdersCoreService,

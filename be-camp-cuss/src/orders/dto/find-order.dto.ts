@@ -6,7 +6,7 @@ export class FindOrderResponseDto {
   id: number;
 
   @IsNumber({}, { message: 'User ID harus berupa angka' })
-  userId: number;
+  customerId: number;
 
   @IsNumber({}, { message: 'Driver ID harus berupa angka' })
   driverId: number;
@@ -28,4 +28,36 @@ export class FindOrderResponseDto {
 
   @IsNumber({}, { message: 'Tanggal dibuat harus berupa angka' })
   createdAt: number;
+
+  customerInfo: CustomerInfo;
+
+  driverInfo: DriverInfo;
+}
+
+class CustomerInfo {
+  @IsNumber({}, { message: 'ID harus berupa angka' })
+  id: number;
+
+  @IsString({ message: 'Username harus berupa teks' })
+  username: string;
+
+  @IsString({ message: 'Email harus berupa teks' })
+  email: string;
+
+  @IsString({ message: 'Nomor telepon harus berupa teks' })
+  noPhone: string;
+}
+
+class DriverInfo {
+  @IsNumber({}, { message: 'ID harus berupa angka' })
+  id: number;
+
+  @IsString({ message: 'Username harus berupa teks' })
+  username: string;
+
+  @IsString({ message: 'Email harus berupa teks' })
+  email: string;
+
+  @IsString({ message: 'Nomor telepon harus berupa teks' })
+  noPhone: string;
 }

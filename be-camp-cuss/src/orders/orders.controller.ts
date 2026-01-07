@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { OrdersCoreService } from './services/orders-core.service';
 import { OrdersDriverService } from './services/orders-driver.service';
@@ -18,6 +19,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { User } from '../common/decorators/user.decorator';
 import { OrdersCustomerService } from './services/orders-customer.service';
+import { ApiQueryParams } from '../common/types/api-request.interface';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -31,7 +33,10 @@ export class OrdersController {
   // Customer actions
   @Post()
   @Roles(Role.customer)
-  async create(@User('id') customerId: number, @Body() dto: CreateOrderDto) {
+  async create(
+    @Body() dto: CreateOrderDto,
+    @User('userId') customerId: number,
+  ) {
     const order = await this.ordersCore.create(customerId, dto);
     return {
       status: 'success',
@@ -43,13 +48,22 @@ export class OrdersController {
 
   @Get()
   @Roles(Role.admin, Role.customer, Role.driver)
-  async findAll(@User('role') role: Role, @User('id') userId: number) {
-    const orders = await this.ordersCore.findAll(role, userId);
+  async findAll(
+    @User('role') role: Role,
+    @User('userId') userId: number,
+    @Query() query: ApiQueryParams,
+  ) {
+    const { data: orders, meta } = await this.ordersCore.findAll(
+      role,
+      userId,
+      query,
+    );
+
     return {
       status: 'success',
       message: 'Daftar pesanan berhasil diambil',
       data: orders,
-      meta: { total: orders.length },
+      meta,
     };
   }
 
@@ -91,7 +105,10 @@ export class OrdersController {
 
   @Post(':id/cancel')
   @Roles(Role.customer)
-  async cancelOrder(@Param('id') orderId: string, @User('id') userId: number) {
+  async cancelOrder(
+    @Param('id') orderId: string,
+    @User('userId') userId: number,
+  ) {
     const order = await this.ordercustomer.cancelOrder(+orderId, userId);
     return {
       status: 'success',
@@ -106,7 +123,7 @@ export class OrdersController {
   @Roles(Role.driver)
   async acceptOrder(
     @Param('id') orderId: string,
-    @User('id') driverId: number,
+    @User('userId') driverId: number,
   ) {
     const order = await this.ordersDriver.acceptOrder(+orderId, driverId);
     return {
@@ -121,7 +138,7 @@ export class OrdersController {
   @Roles(Role.driver)
   async completeOrder(
     @Param('id') orderId: string,
-    @User('id') driverId: number,
+    @User('userId') driverId: number,
   ) {
     const order = await this.ordersDriver.completeOrder(+orderId, driverId);
     return {

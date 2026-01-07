@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SocketWithUser } from './types/socket-user.interface';
+import { SocketWithUser } from '../common/types/socket-user.interface';
 import { JwtService } from '@nestjs/jwt';
 import { UserPayload } from '../common/types/user-context.interface';
 import {

@@ -1,9 +1,9 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
-import { PrismaErrorHelper } from '../../common/helpers/prisma-error.helper';
 import { Order } from '@prisma/client';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 import { OrderStatus } from '../../common/enums/order.enum';
+import { ErrorHelper } from '../../common/helpers/error.helper';
 
 @Injectable()
 export class OrdersCustomerService {
@@ -20,9 +20,13 @@ export class OrdersCustomerService {
         where: { customer_id: customerId },
         orderBy: { created_at: 'desc' },
       });
-    } catch (e) {
-      if (e instanceof HttpException) throw e;
-      PrismaErrorHelper.handle(e);
+    } catch (err) {
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        `Gagal mengambil data pesanan untuk customer #${customerId}`,
+      );
     }
   }
 
@@ -58,9 +62,13 @@ export class OrdersCustomerService {
       );
 
       return updated;
-    } catch (e) {
-      if (e instanceof HttpException) throw e;
-      PrismaErrorHelper.handle(e);
+    } catch (err) {
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        `Gagal membatalkan pesanan #${orderId} untuk customer #${customerId}`,
+      );
     }
   }
 }

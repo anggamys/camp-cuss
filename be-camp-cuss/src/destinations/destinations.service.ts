@@ -10,6 +10,7 @@ import { StoragesService } from '../storages/storages.service';
 import { Destination } from '@prisma/client';
 import { ApiQueryParams } from '../common/types/api-request.interface';
 import { MetaResponse } from '../common/types/api-response.interface';
+import { ErrorHelper } from '../common/helpers/error.helper';
 
 @Injectable()
 export class DestinationsService {
@@ -68,14 +69,36 @@ export class DestinationsService {
       const limit = Number(query.limit) || 10;
       const skip = (page - 1) * limit;
 
-      const [data, total] = await Promise.all([
-        this.prisma.destination.findMany({
-          skip,
+      const search = query.search
+        ? ({
+            field: 'name',
+            query: String(query.search),
+            mode: 'insensitive',
+          } as const)
+        : undefined;
+
+      const [rawData, total] = await Promise.all([
+        this.prismaHelper.findAllRecords('destination', {
           take: limit,
-          orderBy: { [query.sortBy || 'createdAt']: query.sortOrder || 'desc' },
+          skip,
+          search,
+          orderBy: {
+            [query.sortBy || 'created_at']: query.sortOrder || 'desc',
+          },
         }),
-        this.prisma.destination.count(),
+        search
+          ? this.prisma.destination.count({
+              where: {
+                [search.field]: {
+                  contains: search.query,
+                  mode: search.mode,
+                },
+              },
+            })
+          : this.prisma.destination.count(),
       ]);
+
+      const data: Destination[] = rawData as Destination[];
 
       const meta: MetaResponse = {
         total,
@@ -86,11 +109,11 @@ export class DestinationsService {
 
       return { data, meta };
     } catch (err) {
-      if (err instanceof HttpException) throw err;
-
-      throw new HttpException(
-        'Terjadi kesalahan saat mengambil daftar destinasi',
-        500,
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        'Gagal mengambil daftar destinasi',
       );
     }
   }
@@ -106,11 +129,11 @@ export class DestinationsService {
 
       return destination;
     } catch (err) {
-      if (err instanceof HttpException) throw err;
-
-      throw new HttpException(
-        'Terjadi kesalahan saat mengambil data destinasi',
-        500,
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        `Gagal mengambil destinasi dengan ID: ${id}`,
       );
     }
   }
@@ -151,11 +174,11 @@ export class DestinationsService {
 
       return updatedDestination;
     } catch (err) {
-      if (err instanceof HttpException) throw err;
-
-      throw new HttpException(
-        'Terjadi kesalahan saat memperbarui destinasi',
-        500,
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        `Gagal memperbarui destinasi dengan ID: ${id}`,
       );
     }
   }
@@ -180,11 +203,11 @@ export class DestinationsService {
         this.context,
       );
     } catch (err) {
-      if (err instanceof HttpException) throw err;
-
-      throw new HttpException(
-        'Terjadi kesalahan saat menghapus destinasi',
-        500,
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        `Gagal menghapus destinasi dengan ID: ${id}`,
       );
     }
   }
@@ -219,11 +242,11 @@ export class DestinationsService {
 
       return updatedDestination.image_place ?? '';
     } catch (err) {
-      if (err instanceof HttpException) throw err;
-
-      throw new HttpException(
-        'Terjadi kesalahan saat memperbarui gambar destinasi',
-        500,
+      ErrorHelper.handle(
+        err,
+        this.logger,
+        this.context,
+        `Gagal memperbarui gambar destinasi dengan ID: ${id}`,
       );
     }
   }

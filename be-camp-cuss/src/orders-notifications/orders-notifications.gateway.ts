@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { UseGuards, UseInterceptors } from '@nestjs/common';
-import { SocketWithUser } from './types/socket-user.interface';
+import { SocketWithUser } from '../common/types/socket-user.interface';
 import { OrderAvailableNotificationDto } from './dto/orders-notification.dto';
 import { ToggleOrderSubscriptionDto } from './dto/toggle-order-subs.dto';
 import { WsJwtGuard } from '../common/guards/ws-jwt.guard';

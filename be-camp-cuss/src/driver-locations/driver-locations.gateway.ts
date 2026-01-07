@@ -15,7 +15,7 @@ import { WsAuthMiddleware } from '../common/middlewares/ws-auth.middleware';
 import { DriverLocationsService } from './driver-locations.service';
 import { UpdateDriverLocationDto } from './dto/update-driver-location.dto';
 import { TopicDriverLocationSocketIo } from '../common/enums/topic-socket-io.enum';
-import { SocketWithUser } from '../orders-notifications/types/socket-user.interface';
+import { SocketWithUser } from '../common/types/socket-user.interface';
 import { BaseGateway } from '../common/gateways/base.gateway';
 import { DriverLocationData } from '../common/types/driver.interface';
 
@@ -41,6 +41,7 @@ export class DriverLocationsGateway extends BaseGateway {
       const wsAuth = new WsAuthMiddleware(this.jwt, this.config, this.logger);
       wsAuth.use(socket, next);
     });
+
     this.logger.log('DriverLocationsGateway initialized', this.context);
   }
 
@@ -58,7 +59,7 @@ export class DriverLocationsGateway extends BaseGateway {
     @MessageBody() data: UpdateDriverLocationDto,
   ) {
     await this.safeHandle(client, 'updateDriverLocation', async () => {
-      const driverId = client.user?.id;
+      const driverId = client.user?.userId;
       if (!driverId) throw new WsException('User ID tidak ditemukan');
 
       this.logger.debug(
