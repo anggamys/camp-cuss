@@ -14,7 +14,7 @@ interface JwtPayload {
 
 interface AuthenticatedSocket extends Socket {
   user?: {
-    id: number;
+    userId: number;
     username: string;
     role: string;
   };
@@ -32,18 +32,21 @@ export class WsAuthMiddleware {
 
   use(socket: AuthenticatedSocket, next: (err?: Error) => void): void {
     const socketId = socket.id;
+
     const rawAddr =
       socket.handshake.address ??
       socket.handshake.headers['x-forwarded-for'] ??
       'unknown';
+
     const addr = Array.isArray(rawAddr) ? rawAddr.join(',') : String(rawAddr);
+
     this.logger.debug(
-      `Authenticating socket ${socketId} from ${addr}`,
+      `Mengautentikasi socket ${socketId} dari ${addr}`,
       this.context,
     );
 
     try {
-      // ambil token dari query atau header
+      // Get token from query or header
       const token =
         (socket.handshake.query.token as string) ||
         (socket.handshake.headers.authorization as string)?.replace(
@@ -52,38 +55,46 @@ export class WsAuthMiddleware {
         );
 
       if (!token) {
-        this.logger.warn(`Missing token for socket ${socketId}`, this.context);
-        throw new UnauthorizedException('Token wajib disertakan');
+        this.logger.warn(
+          `Token tidak ditemukan untuk socket ${socketId}`,
+          this.context,
+        );
+
+        throw new UnauthorizedException('Token diperlukan');
       }
 
       const secret = this.config.get<string>('JWT_ACCESS_SECRET');
+
       if (!secret) {
-        this.logger.error('JWT secret not configured', this.context);
-        throw new UnauthorizedException('JWT secret not configured');
+        this.logger.error('JWT secret belum dikonfigurasi', this.context);
+        throw new UnauthorizedException('JWT secret belum dikonfigurasi');
       }
 
       const payload = this.jwt.verify<JwtPayload>(token, { secret });
 
       socket.user = {
-        id: payload.sub,
+        userId: payload.sub,
         username: payload.username,
         role: payload.role,
       };
 
       this.logger.debug(
-        `Socket ${socketId} authenticated as user=${payload.username} id=${payload.sub}`,
+        `Socket ${socketId} terautentikasi sebagai user=${payload.username} id=${payload.sub}`,
         this.context,
       );
 
-      next(); // lanjut koneksi
+      next();
     } catch (err) {
-      // Log the reason without leaking token or sensitive data
       const message = err instanceof Error ? err.message : String(err);
+
       this.logger.warn(
-        `Authentication failed for socket ${socketId}: ${message}`,
+        `Autentikasi gagal untuk socket ${socketId}: ${message}`,
         this.context,
       );
-      next(new UnauthorizedException('Token tidak valid atau kedaluwarsa'));
+
+      next(
+        new UnauthorizedException('Token tidak valid atau sudah kedaluwarsa'),
+      );
     }
   }
 }

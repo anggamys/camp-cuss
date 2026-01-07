@@ -19,10 +19,10 @@ export class UserContextInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
 
-    if (request.user?.id) {
+    if (request.user?.userId) {
       const currentContext = this.context.getAll();
       if (currentContext) {
-        currentContext.userId = request.user.id;
+        currentContext.userId = request.user.userId;
       }
     }
 

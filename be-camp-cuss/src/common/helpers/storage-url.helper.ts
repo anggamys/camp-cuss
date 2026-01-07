@@ -36,6 +36,7 @@ export class StorageUrlHelper {
         undefined,
         this.loggerContext,
       );
+
       throw new HttpException(
         'Entity harus berupa object',
         HttpStatus.BAD_REQUEST,
@@ -60,6 +61,7 @@ export class StorageUrlHelper {
           (err as Error)?.stack,
           this.loggerContext,
         );
+
         throw new HttpException(
           `Gagal membangun URL untuk field ${field}`,
           HttpStatus.INTERNAL_SERVER_ERROR,
@@ -79,6 +81,7 @@ export class StorageUrlHelper {
         undefined,
         this.loggerContext,
       );
+
       throw new HttpException(
         'Entities harus berupa array',
         HttpStatus.BAD_REQUEST,

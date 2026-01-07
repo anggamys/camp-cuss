@@ -15,7 +15,7 @@ import { RequestContextService } from '../contexts/request-context.service';
 @Injectable()
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
-  private readonly logName = HttpExceptionFilter.name;
+  private readonly contextName = HttpExceptionFilter.name;
 
   constructor(
     private readonly logger: AppLoggerService,
@@ -43,25 +43,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ) {
         const body = exceptionResponse as HttpErrorBody;
 
-        // Ambil pesan utama
-        if (typeof body.message === 'string') message = body.message;
+        if (typeof body.message === 'string') {
+          message = body.message;
+        }
 
-        // Ambil field errors
         if (body.errors && typeof body.errors === 'object') {
           errors = Object.entries(body.errors).reduce<Record<string, string[]>>(
             (acc, [key, val]) => {
               if (!val) return acc;
-              const values = Array.isArray(val)
-                ? val.map((v) => String(v))
-                : [String(val)];
-              acc[key] = values;
+              acc[key] = Array.isArray(val) ? val.map(String) : [String(val)];
               return acc;
             },
             {},
           );
         }
 
-        // Fallback: error dari ValidationPipe
         if (
           Array.isArray(body.message) &&
           typeof body.message[0] === 'object' &&
@@ -95,11 +91,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const baseLogMsg = `HTTP ${method} ${path} [${status}] - ${message}`;
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(baseLogMsg, (exception as Error)?.stack, this.logName);
+      this.logger.error(
+        baseLogMsg,
+        (exception as Error)?.stack,
+        this.contextName,
+      );
     } else if (status >= HttpStatus.BAD_REQUEST) {
-      this.logger.warn(baseLogMsg, this.logName);
+      this.logger.warn(baseLogMsg, this.contextName);
     } else {
-      this.logger.log(baseLogMsg, this.logName);
+      this.logger.log(baseLogMsg, this.contextName);
     }
 
     const errorResponse: ErrorResponse = {

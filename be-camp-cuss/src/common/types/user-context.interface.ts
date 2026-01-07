@@ -1,10 +1,10 @@
 export interface UserPayload {
-  id: number;
+  userId: number;
   username: string;
   role: string;
 }
 
-export interface JwtPayload extends Omit<UserPayload, 'id'> {
+export interface JwtPayload extends Omit<UserPayload, 'userId'> {
   sub: number;
 }
 
