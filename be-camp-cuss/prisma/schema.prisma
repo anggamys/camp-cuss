@@ -88,7 +88,7 @@ model Order {
   created_at          DateTime       @default(now())
   updated_at          DateTime       @updatedAt
 
-  user                User           @relation("CustomerOrders", fields: [customer_id], references: [id])
+  customer            User           @relation("CustomerOrders", fields: [customer_id], references: [id])
   driver              User?          @relation("DriverOrders", fields: [driver_id], references: [id])
   destination         Destination    @relation(fields: [destination_id], references: [id])
 
@@ -142,6 +142,7 @@ model ChatRoom {
   id            Int         @id @default(autoincrement())
   order_id      Int         @unique
   is_active     Boolean     @default(true)
+  user_ids      Int[]
   created_at    DateTime    @default(now())
   updated_at    DateTime    @updatedAt
 
