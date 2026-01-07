@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './services/users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -19,6 +20,7 @@ import { UsersDriverRequestService } from './services/users-driver-request.servi
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { CreateDriverRequest } from './dto/create-driver-request.dto';
+import { ApiQueryParams } from '../common/types/api-request.interface';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -36,14 +38,19 @@ export class UsersController {
   }
 
   @Get()
-  async findAll() {
-    const users = await this.usersService.findAll();
-    return { message: 'Daftar pengguna', data: users };
+  async findAll(@Query() query: ApiQueryParams) {
+    const { data: users, meta } = await this.usersService.findAll(query);
+
+    if (users.length === 0) {
+      return { message: 'Tidak ada pengguna', data: [], meta };
+    }
+
+    return { message: 'Daftar pengguna', data: users, meta };
   }
 
   @Post('request-driver')
   async requestDriver(
-    @User('id') userId: number,
+    @User('userId') userId: number,
     @Body() dto: CreateDriverRequest,
   ) {
     const createdDriverRequest =
@@ -56,21 +63,23 @@ export class UsersController {
 
   @Roles(Role.admin)
   @Get('driver-requests')
-  async listDriverRequests() {
-    const requests = await this.driverRequestService.findAllDriverRequests();
+  async listDriverRequests(@Query() query: ApiQueryParams) {
+    const { data: requests, meta } =
+      await this.driverRequestService.findAllDriverRequests(query);
+
     if (requests.length === 0) {
       return { message: 'Tidak ada permintaan driver', data: [] };
     }
 
-    return { message: 'Daftar permintaan driver', data: requests };
+    return { message: 'Daftar permintaan driver', data: requests, meta };
   }
 
   @Roles(Role.admin)
   @Post('driver-requests/:id/approve')
   async approveDriverRequest(
-    @Param('id', ParseIntPipe) driverRequestId: number,
+    @User('userId') adminId: number,
     @Body() dto: ApproveDriverRequestDto,
-    @User('id') adminId: number,
+    @Param('id', ParseIntPipe) driverRequestId: number,
   ) {
     const result = await this.driverRequestService.approveDriverRequest(
       driverRequestId,
@@ -89,9 +98,9 @@ export class UsersController {
 
   @Patch(':id')
   async update(
-    @User('id') accessUserId: number,
-    @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserDto,
+    @User('userId') accessUserId: number,
+    @Param('id', ParseIntPipe) id: number,
   ) {
     const updatedUser = await this.usersService.update(accessUserId, id, dto);
     return { message: 'Data pengguna diperbarui', data: updatedUser };
