@@ -11,7 +11,7 @@ import {
 import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '../common/enums/role.enum';
+import { Role } from '../common/enums/user.enum';
 import { Public } from '../common/decorators/public.decorator';
 import { MidtransCallbackDto } from './dto/midtrans-callback.dto';
 import { PaymentsQueryService } from './services/payments-query.service';
@@ -29,7 +29,7 @@ export class PaymentsController {
   ) {}
 
   @Post(':orderId')
-  @Roles(Role.driver)
+  @Roles(Role.Driver)
   async createPayment(@Param('orderId', ParseIntPipe) orderId: number) {
     const payment =
       await this.paymentMidtransService.createTransaction(orderId);
@@ -53,7 +53,7 @@ export class PaymentsController {
   }
 
   @Get()
-  @Roles(Role.admin)
+  @Roles(Role.Admin)
   async getAllPayments(@Query() query: ApiQueryParams) {
     const { data, meta } = await this.paymentQueryService.getAll(query);
 

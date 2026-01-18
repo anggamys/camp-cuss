@@ -16,12 +16,12 @@ import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
-import { Role } from '../common/enums/role.enum';
+import { Role } from '../common/enums/user.enum';
 import { ApiQueryParams } from '../common/types/api-request.interface';
 
 @Controller('destinations')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.admin)
+@Roles(Role.Admin)
 export class DestinationsController {
   constructor(private readonly destinationsService: DestinationsService) {}
 

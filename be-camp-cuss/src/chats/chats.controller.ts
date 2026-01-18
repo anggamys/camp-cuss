@@ -4,11 +4,11 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { User } from '../common/decorators/user.decorator';
-import { Role } from '../common/enums/role.enum';
+import { Role } from '../common/enums/user.enum';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('chats')
-@Roles(Role.customer, Role.driver)
+@Roles(Role.Customer, Role.Driver)
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ChatsController {
   constructor(private readonly chatsService: ChatsService) {}

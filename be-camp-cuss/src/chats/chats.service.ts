@@ -6,7 +6,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { ListMessageDto } from './dto/list-message.dto';
 import { ChatsGateway } from './chats.gateway';
 import { ErrorHelper } from '../common/helpers/error.helper';
-import { Role } from '../common/enums/role.enum';
+import { Role } from '../common/enums/user.enum';
 import {
   FindChatRoomDto,
   FindChatRoomResponseDto,

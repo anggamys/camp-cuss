@@ -18,7 +18,7 @@ import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { User } from '../common/decorators/user.decorator';
 import { UsersDriverRequestService } from './services/users-driver-request.service';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '../common/enums/role.enum';
+import { Role } from '../common/enums/user.enum';
 import { CreateDriverRequest } from './dto/create-driver-request.dto';
 import { ApiQueryParams } from '../common/types/api-request.interface';
 
@@ -34,7 +34,7 @@ export class UsersController {
   async create(@Body() dto: CreateUserDto) {
     const user = await this.usersService.create(dto);
 
-    return { message: 'Pengguna dibuat', data: user };
+    return { message: 'Berhasil membuat pengguna', data: user };
   }
 
   @Get()
@@ -42,10 +42,10 @@ export class UsersController {
     const { data: users, meta } = await this.usersService.findAll(query);
 
     if (users.length === 0) {
-      return { message: 'Tidak ada pengguna', data: [], meta };
+      return { message: 'Tidak ada pengguna ditemukan', data: [], meta };
     }
 
-    return { message: 'Daftar pengguna', data: users, meta };
+    return { message: 'Berhasil mengambil daftar pengguna', data: users, meta };
   }
 
   @Post('request-driver')
@@ -55,26 +55,31 @@ export class UsersController {
   ) {
     const createdDriverRequest =
       await this.driverRequestService.createDriverRequest(userId, dto);
+
     return {
-      message: 'Permintaan driver telah dibuat',
+      message: 'Berhasil mengajukan permintaan driver',
       data: createdDriverRequest,
     };
   }
 
-  @Roles(Role.admin)
+  @Roles(Role.Admin)
   @Get('driver-requests')
   async listDriverRequests(@Query() query: ApiQueryParams) {
     const { data: requests, meta } =
       await this.driverRequestService.findAllDriverRequests(query);
 
     if (requests.length === 0) {
-      return { message: 'Tidak ada permintaan driver', data: [] };
+      return { message: 'Tidak ada permintaan driver ditemukan', data: [] };
     }
 
-    return { message: 'Daftar permintaan driver', data: requests, meta };
+    return {
+      message: 'Berhasil mengambil daftar permintaan driver',
+      data: requests,
+      meta,
+    };
   }
 
-  @Roles(Role.admin)
+  @Roles(Role.Admin)
   @Post('driver-requests/:id/approve')
   async approveDriverRequest(
     @User('userId') adminId: number,
@@ -87,13 +92,13 @@ export class UsersController {
       dto,
     );
 
-    return { message: 'Permintaan driver disetujui', data: result };
+    return { message: 'Berhasil menyetujui permintaan driver', data: result };
   }
 
   @Get(':id')
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const user = await this.usersService.findOne(id);
-    return { message: 'Detail pengguna', data: user };
+    return { message: 'Berhasil mengambil detail pengguna', data: user };
   }
 
   @Patch(':id')
@@ -103,12 +108,14 @@ export class UsersController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     const updatedUser = await this.usersService.update(accessUserId, id, dto);
-    return { message: 'Data pengguna diperbarui', data: updatedUser };
+
+    return { message: 'Berhasil memperbarui data pengguna', data: updatedUser };
   }
 
   @Delete(':id')
   async remove(@Param('id', ParseIntPipe) id: number) {
     const user = await this.usersService.remove(id);
-    return { message: 'Pengguna dihapus', data: user };
+
+    return { message: 'Berhasil menghapus pengguna', data: user };
   }
 }

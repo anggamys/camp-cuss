@@ -48,16 +48,3 @@ export class CreateUserDto {
   @IsString({ message: 'Photo ID card harus berupa string' })
   photo_id_card?: string;
 }
-
-export class CreateUserResponseDto {
-  @IsNotEmpty({ message: 'Id tidak boleh kosong' })
-  id: number;
-
-  @IsEmail({}, { message: 'Email tidak valid' })
-  @IsNotEmpty({ message: 'Email tidak boleh kosong' })
-  email: string;
-
-  @IsString({ message: 'Username harus berupa string' })
-  @IsNotEmpty({ message: 'Username tidak boleh kosong' })
-  username: string;
-}

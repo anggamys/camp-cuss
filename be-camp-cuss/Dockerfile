@@ -16,7 +16,12 @@ COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --prefer-offline
 
 # Copy source code
-COPY . .
+COPY src ./src
+COPY prisma ./prisma
+COPY tsconfig*.json ./
+COPY nest-cli.json ./
+COPY eslint.config.mjs ./
+COPY package*.json ./
 
 # Generate Prisma dan build NestJS
 RUN npx prisma generate && npx nest build

@@ -1,20 +1,13 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { ApprovalStatus, isDriver, Role } from '../../common/enums/user.enum';
 import { PrismaService } from '../../prisma/prisma.services';
-import { UserRole, ApprovalStatus } from '@prisma/client';
-import {
-  CreateDriverRequest,
-  ResponseCreateRequestDriverDto,
-} from '../dto/create-driver-request.dto';
-import {
-  ApproveDriverRequestDto,
-  ResponseApproveDriverRequestDto,
-} from '../dto/approve-driver-request.dto';
-import { DriverRequestItemDto } from '../dto/list-driver-requests.dto';
+import { CreateDriverRequest } from '../dto/create-driver-request.dto';
+import { ApproveDriverRequestDto } from '../dto/approve-driver-request.dto';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 import { ErrorHelper } from '../../common/helpers/error.helper';
 import { ApiQueryParams } from '../../common/types/api-request.interface';
 import { MetaResponse } from '../../common/types/api-response.interface';
-import { PrismaHelper } from '../../common/helpers/prisma.helper';
+import { DriverRequestResponseDto } from '../dto/user-response.dto';
 
 @Injectable()
 export class UsersDriverRequestService {
@@ -22,34 +15,36 @@ export class UsersDriverRequestService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly prismaHelper: PrismaHelper,
     private readonly logger: AppLoggerService,
   ) {}
 
   async createDriverRequest(
-    user_id: number,
+    userId: number,
     dto: CreateDriverRequest,
-  ): Promise<ResponseCreateRequestDriverDto> {
+  ): Promise<DriverRequestResponseDto> {
     try {
       const user = await this.prisma.user.findUnique({
-        where: { id: user_id },
+        where: { id: userId },
       });
+
       if (!user) {
         this.logger.warn(
-          `Pengguna dengan ID ${user_id} tidak ditemukan saat mengajukan permintaan driver`,
+          `Pengguna dengan ID ${userId} tidak ditemukan saat mengajukan permintaan driver`,
           this.context,
         );
+
         throw new HttpException(
           'Pengguna tidak ditemukan',
           HttpStatus.NOT_FOUND,
         );
       }
 
-      if (user.role === UserRole.driver) {
+      if (isDriver(user.role as Role)) {
         this.logger.warn(
-          `Pengguna dengan ID ${user_id} sudah menjadi driver`,
+          `Pengguna dengan ID ${userId} sudah menjadi driver`,
           this.context,
         );
+
         throw new HttpException(
           'Kamu sudah terdaftar sebagai driver',
           HttpStatus.BAD_REQUEST,
@@ -63,9 +58,10 @@ export class UsersDriverRequestService {
         user.photo_student_card,
         user.photo_driving_license,
       ];
+
       if (required.some((x) => !x)) {
         this.logger.warn(
-          `Dokumen belum lengkap untuk user ID ${user_id}`,
+          `Dokumen belum lengkap untuk user ID ${userId} saat mengajukan permintaan driver`,
           this.context,
         );
 
@@ -78,25 +74,27 @@ export class UsersDriverRequestService {
       // Cek existing request aktif
       const activeRequest = await this.prisma.driverRequest.findFirst({
         where: {
-          user_id: user_id,
-          status: { in: [ApprovalStatus.pending, ApprovalStatus.approved] },
+          user_id: userId,
+          status: { in: [ApprovalStatus.Pending, ApprovalStatus.Approved] },
         },
       });
 
       if (activeRequest) {
         const message =
-          activeRequest.status === ApprovalStatus.pending
+          (activeRequest.status as ApprovalStatus) === ApprovalStatus.Pending
             ? 'Permintaan kamu sedang diproses, silakan tunggu persetujuan admin'
             : 'Kamu sudah terdaftar sebagai driver';
+
         this.logger.warn(
-          `Permintaan driver aktif sudah ada untuk user ID ${user_id} dengan status ${activeRequest.status}`,
+          `Permintaan driver aktif sudah ada untuk user ID ${userId} dengan status ${activeRequest.status}`,
           this.context,
         );
+
         throw new HttpException(message, HttpStatus.BAD_REQUEST);
       }
 
       const createdRequest = await this.prisma.driverRequest.create({
-        data: { user_id: user_id, user_notes: dto.user_notes ?? null },
+        data: { user_id: userId, user_notes: dto.user_notes ?? null },
         select: {
           id: true,
           user_id: true,
@@ -104,15 +102,27 @@ export class UsersDriverRequestService {
           user_notes: true,
           admin_notes: true,
           approved_by: true,
+          user: true,
         },
       });
 
       this.logger.log(
-        `Permintaan driver berhasil dibuat untuk user ID ${user_id} dengan request ID ${createdRequest.id}`,
+        `Permintaan driver berhasil dibuat untuk user ID ${userId} dengan request ID ${createdRequest.id}`,
         this.context,
       );
 
-      return createdRequest;
+      const response: DriverRequestResponseDto = {
+        driverRequestId: createdRequest.id,
+        userId: createdRequest.user_id,
+        status: createdRequest.status as ApprovalStatus,
+        userNotes: createdRequest.user_notes,
+        adminNotes: createdRequest.admin_notes,
+        approvedBy: createdRequest.approved_by,
+        ...createdRequest.user,
+        role: createdRequest.user.role as Role,
+      };
+
+      return response;
     } catch (err) {
       ErrorHelper.handle(
         err,
@@ -125,16 +135,16 @@ export class UsersDriverRequestService {
 
   async findAllDriverRequests(
     query: ApiQueryParams,
-  ): Promise<{ data: DriverRequestItemDto[]; meta: MetaResponse }> {
+  ): Promise<{ data: DriverRequestResponseDto[]; meta: MetaResponse }> {
     try {
       const page = Number(query.page) || 1;
       const limit = Number(query.limit) || 10;
       const skip = (page - 1) * limit;
 
       const [requests, total] = await Promise.all([
-        this.prismaHelper.findAllRecords('driverRequest', {
+        this.prisma.driverRequest.findMany({
           where: {
-            status: ApprovalStatus.pending,
+            status: ApprovalStatus.Pending,
           },
           include: { user: true },
           orderBy: {
@@ -145,7 +155,7 @@ export class UsersDriverRequestService {
         }),
         this.prisma.driverRequest.count({
           where: {
-            status: ApprovalStatus.pending,
+            status: ApprovalStatus.Pending,
           },
         }),
       ]);
@@ -167,16 +177,24 @@ export class UsersDriverRequestService {
         this.context,
       );
 
-      const data: DriverRequestItemDto[] = requests.map(
-        (req: DriverRequestItemDto) => ({
-          id: req.id,
-          user: req.user,
-          status: req.status,
-          user_notes: req.user_notes,
-          admin_notes: req.admin_notes,
-          created_at: req.created_at,
-        }),
-      );
+      const data: DriverRequestResponseDto[] = requests.map((req) => ({
+        id: req.id,
+        created_at: req.created_at,
+        driverRequestId: req.id,
+        userId: req.user_id,
+        status: req.status as ApprovalStatus,
+        userNotes: req.user_notes,
+        adminNotes: req.admin_notes,
+        approvedBy: req.approved_by,
+        driverRequestCreatedAt: req.created_at,
+        user: {
+          id: req.user.id,
+          username: req.user.username,
+          email: req.user.email,
+          npm: req.user.npm,
+          no_phone: req.user.no_phone,
+        },
+      }));
 
       const meta: MetaResponse = {
         total,
@@ -197,23 +215,24 @@ export class UsersDriverRequestService {
   }
 
   async approveDriverRequest(
-    request_id: number,
-    admin_id: number,
+    requestId: number,
+    adminId: number,
     dto: ApproveDriverRequestDto,
-  ): Promise<ResponseApproveDriverRequestDto> {
+  ): Promise<DriverRequestResponseDto> {
     try {
       const { approved, admin_notes } = dto;
 
       const request = await this.prisma.driverRequest.findUnique({
-        where: { id: request_id },
+        where: { id: requestId },
         include: { user: true },
       });
 
       if (!request) {
         this.logger.warn(
-          `Permintaan driver dengan ID ${request_id} tidak ditemukan`,
+          `Permintaan driver dengan ID ${requestId} tidak ditemukan`,
           this.context,
         );
+
         throw new HttpException(
           'Permintaan tidak ditemukan',
           HttpStatus.NOT_FOUND,
@@ -221,13 +240,14 @@ export class UsersDriverRequestService {
       }
 
       if (
-        request.status !== ApprovalStatus.pending ||
+        (request.status as ApprovalStatus) !== ApprovalStatus.Pending ||
         request.approved_by !== null
       ) {
         this.logger.warn(
-          `Permintaan driver dengan ID ${request_id} sudah diproses sebelumnya`,
+          `Permintaan driver dengan ID ${requestId} sudah diproses sebelumnya`,
           this.context,
         );
+
         throw new HttpException(
           'Permintaan ini sudah diproses',
           HttpStatus.CONFLICT,
@@ -235,16 +255,16 @@ export class UsersDriverRequestService {
       }
 
       const newStatus = approved
-        ? ApprovalStatus.approved
-        : ApprovalStatus.rejected;
+        ? ApprovalStatus.Approved
+        : ApprovalStatus.Rejected;
 
       await this.prisma.$transaction(async (tx) => {
         await tx.driverRequest.update({
-          where: { id: request_id },
+          where: { id: requestId },
           data: {
             status: newStatus,
             admin_notes: admin_notes ?? null,
-            approved_by: admin_id,
+            approved_by: adminId,
           },
         });
 
@@ -252,7 +272,7 @@ export class UsersDriverRequestService {
           await tx.user.update({
             where: { id: request.user_id },
             data: {
-              role: UserRole.driver,
+              role: Role.Driver,
               driver_status: 'approved',
             },
           });
@@ -265,18 +285,35 @@ export class UsersDriverRequestService {
       });
 
       this.logger.log(
-        `Permintaan driver dengan ID ${request_id} telah ${newStatus === ApprovalStatus.approved ? 'disetujui' : 'ditolak'} oleh admin ID ${admin_id}`,
+        `Permintaan driver dengan ID ${requestId} telah ${newStatus === ApprovalStatus.Approved ? 'disetujui' : 'ditolak'} oleh admin ID ${adminId}`,
         this.context,
       );
 
-      return {
-        id: request.id,
-        status: newStatus,
-        user_notes: request.user_notes,
-        admin_notes: admin_notes ?? null,
-        created_at: request.created_at,
-        approved_by: admin_id,
+      // Ambil data permintaan driver yang sudah diperbarui
+      const updatedRequest = await this.prisma.driverRequest.findUnique({
+        where: { id: requestId },
+        include: { user: true },
+      });
+
+      if (!updatedRequest) {
+        throw new HttpException(
+          'Permintaan tidak ditemukan setelah update',
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const response: DriverRequestResponseDto = {
+        driverRequestId: updatedRequest.id,
+        userId: updatedRequest.user_id,
+        status: updatedRequest.status as ApprovalStatus,
+        userNotes: updatedRequest.user_notes,
+        adminNotes: updatedRequest.admin_notes,
+        approvedBy: updatedRequest.approved_by,
+        ...updatedRequest.user,
+        role: updatedRequest.user.role as Role,
       };
+
+      return response;
     } catch (err) {
       ErrorHelper.handle(
         err,

@@ -1,18 +1,17 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
-import { CreateUserDto, CreateUserResponseDto } from '../dto/create-user.dto';
-import { FindUserResponseDto } from '../dto/find-user.dto';
-import { UpdateUserDto, UpdateUserResponseDto } from '../dto/update-user.dto';
+import { CreateUserDto } from '../dto/create-user.dto';
+import { UpdateUserDto } from '../dto/update-user.dto';
 import { PasswordHelper } from '../../common/helpers/password.helper';
 import { StoragesService } from '../../storages/storages.service';
 import { StorageUrlHelper } from '../../common/helpers/storage-url.helper';
 import { UsersUploadService } from './users-upload.service';
-import { PrismaHelper } from '../../common/helpers/prisma.helper';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 import { ErrorHelper } from '../../common/helpers/error.helper';
 import { ApiQueryParams } from '../../common/types/api-request.interface';
-import { User } from '@prisma/client';
 import { MetaResponse } from '../../common/types/api-response.interface';
+import { UserResponseDto } from '../dto/user-response.dto';
+import { ApprovalStatus, Role } from '../../common/enums/user.enum';
 
 @Injectable()
 export class UsersService {
@@ -20,16 +19,34 @@ export class UsersService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly prismaHelper: PrismaHelper,
     private readonly storages: StoragesService,
     private readonly usersUploadService: UsersUploadService,
     private readonly logger: AppLoggerService,
   ) {}
 
-  async create(dto: CreateUserDto): Promise<CreateUserResponseDto> {
+  async create(dto: CreateUserDto): Promise<UserResponseDto> {
     try {
-      await this.prismaHelper.assertUnique('user', 'email', dto.email);
-      await this.prismaHelper.assertUnique('user', 'username', dto.username);
+      const emailExists = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
+
+      if (emailExists) {
+        throw new HttpException(
+          'Email sudah terdaftar',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const usernameExists = await this.prisma.user.findUnique({
+        where: { username: dto.username },
+      });
+
+      if (usernameExists) {
+        throw new HttpException(
+          'Username sudah terdaftar',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
 
       this.logger.debug(
         `Membuat pengguna: ${dto.email} / ${dto.username}`,
@@ -37,6 +54,7 @@ export class UsersService {
       );
 
       const hashed = await PasswordHelper.hash(dto.password);
+
       const created = await this.prisma.user.create({
         data: { ...dto, password: hashed },
         select: { id: true, email: true, username: true },
@@ -47,7 +65,13 @@ export class UsersService {
         this.context,
       );
 
-      return created;
+      const data: UserResponseDto = {
+        id: created.id,
+        email: created.email,
+        username: created.username,
+      };
+
+      return data;
     } catch (err) {
       ErrorHelper.handle(
         err,
@@ -60,7 +84,7 @@ export class UsersService {
 
   async findAll(
     query: ApiQueryParams,
-  ): Promise<{ data: FindUserResponseDto[]; meta: MetaResponse }> {
+  ): Promise<{ data: UserResponseDto[]; meta: MetaResponse }> {
     try {
       let where = {};
 
@@ -85,9 +109,21 @@ export class UsersService {
       }
 
       const [rawData, totalData] = await Promise.all([
-        this.prismaHelper.findAllRecords('user', {
+        this.prisma.user.findMany({
           take: limit,
           skip: skip,
+          select: {
+            id: true,
+            username: true,
+            npm: true,
+            email: true,
+            driver_status: true,
+            no_phone: true,
+            photo_profile: true,
+            role: true,
+            created_at: true,
+            updated_at: true,
+          },
           where,
           orderBy: {
             [query.sortBy || 'created_at']: query.sortOrder || 'desc',
@@ -101,6 +137,7 @@ export class UsersService {
           'Tidak ada pengguna ditemukan pada findAll',
           this.context,
         );
+
         return {
           data: [],
           meta: { total: 0, page, last_page: 0, per_page: limit },
@@ -108,9 +145,7 @@ export class UsersService {
       }
 
       const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
-      const usersWithUrls = await storageHelper.buildFileUrlsForArray(
-        rawData as User[],
-      );
+      const usersWithUrls = await storageHelper.buildFileUrlsForArray(rawData);
 
       this.logger.debug(
         `Mengembalikan ${usersWithUrls.length} pengguna dari findAll`,
@@ -124,7 +159,20 @@ export class UsersService {
         per_page: limit,
       };
 
-      return { data: usersWithUrls as FindUserResponseDto[], meta };
+      const data: UserResponseDto[] = usersWithUrls.map((user) => ({
+        id: user.id as number,
+        username: user.username as string,
+        npm: user.npm as string,
+        email: user.email as string,
+        DriverStatus: user.driver_status as string,
+        noPhone: user.no_phone as string,
+        photoProfile: user.photo_profile as string,
+        role: user.role as Role,
+        createdAt: user.created_at as Date,
+        updatedAt: user.updated_at as Date,
+      }));
+
+      return { data, meta };
     } catch (err) {
       ErrorHelper.handle(
         err,
@@ -132,19 +180,36 @@ export class UsersService {
         this.context,
         'Gagal mengambil daftar pengguna',
       );
-      throw err;
     }
   }
 
-  async findOne(id: number): Promise<FindUserResponseDto> {
+  async findOne(id: number): Promise<UserResponseDto> {
     try {
-      const rawData = await this.prismaHelper.findRecord('user', 'id', id);
+      const rawData = await this.prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          username: true,
+          npm: true,
+          email: true,
+          driver_status: true,
+          no_phone: true,
+          photo_profile: true,
+          role: true,
+          photo_id_card: true,
+          photo_student_card: true,
+          photo_driving_license: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
 
       if (!rawData) {
         this.logger.warn(
           `Pengguna tidak ditemukan pada findOne (id: ${id})`,
           this.context,
         );
+
         throw new HttpException(
           'Pengguna tidak ditemukan',
           HttpStatus.NOT_FOUND,
@@ -152,14 +217,30 @@ export class UsersService {
       }
 
       const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
-      const userWithUrls = await storageHelper.buildFileUrls(rawData as User);
+      const userWithUrls = await storageHelper.buildFileUrls(rawData);
 
       this.logger.debug(
         `Mengembalikan pengguna dari findOne (id: ${id})`,
         this.context,
       );
 
-      return userWithUrls as FindUserResponseDto;
+      const data: UserResponseDto = {
+        id: userWithUrls.id as number,
+        username: userWithUrls.username as string,
+        npm: userWithUrls.npm as string,
+        email: userWithUrls.email as string,
+        driverStatus: userWithUrls.driver_status as ApprovalStatus,
+        noPhone: userWithUrls.no_phone as string,
+        photoProfile: userWithUrls.photo_profile as string,
+        role: userWithUrls.role as Role,
+        photoIdCard: userWithUrls.photo_id_card as string,
+        photoStudentCard: userWithUrls.photo_student_card as string,
+        photoDriverLicense: userWithUrls.photo_driving_license as string,
+        createdAt: userWithUrls.created_at as Date,
+        updatedAt: userWithUrls.updated_at as Date,
+      };
+
+      return data;
     } catch (err) {
       ErrorHelper.handle(
         err,
@@ -174,13 +255,14 @@ export class UsersService {
     accessUserId: number,
     id: number,
     dto: UpdateUserDto,
-  ): Promise<UpdateUserResponseDto> {
+  ): Promise<UserResponseDto> {
     try {
       if (accessUserId !== id) {
         this.logger.warn(
           `Akses ditolak untuk update (accessUserId: ${accessUserId}, id: ${id})`,
           this.context,
         );
+
         throw new HttpException('Akses ditolak', HttpStatus.FORBIDDEN);
       }
 
@@ -191,6 +273,7 @@ export class UsersService {
           `Pengguna tidak ditemukan pada update (id: ${id})`,
           this.context,
         );
+
         throw new HttpException(
           'Pengguna tidak ditemukan',
           HttpStatus.NOT_FOUND,
@@ -203,12 +286,46 @@ export class UsersService {
 
       const updated = await this.prisma.user.update({
         where: { id },
+        select: {
+          id: true,
+          username: true,
+          npm: true,
+          email: true,
+          driver_status: true,
+          no_phone: true,
+          photo_profile: true,
+          role: true,
+          photo_id_card: true,
+          photo_student_card: true,
+          photo_driving_license: true,
+          created_at: true,
+          updated_at: true,
+        },
         data: { ...dto, password },
       });
 
       this.logger.log(`Pengguna berhasil diperbarui (id: ${id})`, this.context);
 
-      return updated;
+      const storageHelper = StorageUrlHelper.create(this.storages, this.logger);
+      const userWithUrls = await storageHelper.buildFileUrls(updated);
+
+      const data: UserResponseDto = {
+        id: userWithUrls.id as number,
+        username: userWithUrls.username as string,
+        npm: userWithUrls.npm as string,
+        email: userWithUrls.email as string,
+        driverStatus: userWithUrls.driver_status as ApprovalStatus,
+        noPhone: userWithUrls.no_phone as string,
+        photoProfile: userWithUrls.photo_profile as string,
+        role: userWithUrls.role as Role,
+        photoIdCard: userWithUrls.photo_id_card as string,
+        photoStudentCard: userWithUrls.photo_student_card as string,
+        photoDriverLicense: userWithUrls.photo_driving_license as string,
+        createdAt: userWithUrls.created_at as Date,
+        updatedAt: userWithUrls.updated_at as Date,
+      };
+
+      return data;
     } catch (err) {
       ErrorHelper.handle(
         err,

@@ -1,5 +1,5 @@
 import { IsEnum, IsNumber, IsString } from 'class-validator';
-import { Role } from '../../common/enums/role.enum';
+import { Role } from '../../common/enums/user.enum';
 
 export class ListMessageDto {
   @IsNumber()

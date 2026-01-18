@@ -16,7 +16,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '../common/enums/role.enum';
+import { Role } from '../common/enums/user.enum';
 import { User } from '../common/decorators/user.decorator';
 import { OrdersCustomerService } from './services/orders-customer.service';
 import { ApiQueryParams } from '../common/types/api-request.interface';
@@ -32,7 +32,7 @@ export class OrdersController {
 
   // Customer actions
   @Post()
-  @Roles(Role.customer)
+  @Roles(Role.Customer)
   async create(
     @Body() dto: CreateOrderDto,
     @User('userId') customerId: number,
@@ -47,7 +47,7 @@ export class OrdersController {
   }
 
   @Get()
-  @Roles(Role.admin, Role.customer, Role.driver)
+  @Roles(Role.Admin, Role.Customer, Role.Driver)
   async findAll(
     @User('role') role: Role,
     @User('userId') userId: number,
@@ -73,7 +73,7 @@ export class OrdersController {
   }
 
   @Get(':id')
-  @Roles(Role.admin, Role.customer, Role.driver)
+  @Roles(Role.Admin, Role.Customer, Role.Driver)
   async findOne(@Param('id') id: string) {
     const order = await this.ordersCore.findOne(+id);
     return {
@@ -85,7 +85,7 @@ export class OrdersController {
   }
 
   @Patch(':id')
-  @Roles(Role.admin)
+  @Roles(Role.Admin)
   async update(@Param('id') id: string, @Body() dto: UpdateOrderDto) {
     const order = await this.ordersCore.update(+id, dto);
     return {
@@ -97,7 +97,7 @@ export class OrdersController {
   }
 
   @Delete(':id')
-  @Roles(Role.admin)
+  @Roles(Role.Admin)
   async remove(@Param('id') id: string) {
     await this.ordersCore.remove(+id);
     return {
@@ -109,7 +109,7 @@ export class OrdersController {
   }
 
   @Post(':id/cancel')
-  @Roles(Role.customer)
+  @Roles(Role.Customer)
   async cancelOrder(
     @Param('id') orderId: string,
     @User('userId') userId: number,
@@ -125,7 +125,7 @@ export class OrdersController {
 
   // Driver actions
   @Post(':id/accept')
-  @Roles(Role.driver)
+  @Roles(Role.Driver)
   async acceptOrder(
     @Param('id') orderId: string,
     @User('userId') driverId: number,
@@ -140,7 +140,7 @@ export class OrdersController {
   }
 
   @Post(':id/complete')
-  @Roles(Role.driver)
+  @Roles(Role.Driver)
   async completeOrder(
     @Param('id') orderId: string,
     @User('userId') driverId: number,

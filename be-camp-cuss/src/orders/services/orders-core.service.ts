@@ -8,7 +8,7 @@ import { UpdateOrderDto } from '../dto/update-order.dto';
 import { Order, OrderStatus, User } from '@prisma/client';
 import { OrdersBroadcastService } from './orders-broadcast.service';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
-import { Role } from '../../common/enums/role.enum';
+import { Role } from '../../common/enums/user.enum';
 import { ApiQueryParams } from '../../common/types/api-request.interface';
 import { MetaResponse } from '../../common/types/api-response.interface';
 import { PrismaHelper } from '../../common/helpers/prisma.helper';
@@ -88,10 +88,10 @@ export class OrdersCoreService {
     try {
       let where = {};
 
-      if (role === Role.driver) {
+      if (role === Role.Driver) {
         where = { driver_id: userId };
       }
-      if (role === Role.customer) {
+      if (role === Role.Customer) {
         where = { customer_id: userId };
       }
 
