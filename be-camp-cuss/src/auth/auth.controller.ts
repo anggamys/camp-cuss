@@ -17,7 +17,7 @@ export class AuthController {
     const user = await this.authService.register(body);
 
     return {
-      message: 'Registrasi berhasil',
+      message: 'Pengguna berhasil didaftarkan',
       data: user,
     };
   }

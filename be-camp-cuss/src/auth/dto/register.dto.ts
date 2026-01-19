@@ -32,16 +32,3 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Nomor telepon tidak boleh kosong' })
   no_phone: string;
 }
-
-export class RegisterUserResponseDto {
-  @IsNotEmpty({ message: 'Id tidak boleh kosong' })
-  id: number;
-
-  @IsEmail({}, { message: 'Email tidak valid' })
-  @IsNotEmpty({ message: 'Email tidak boleh kosong' })
-  email: string;
-
-  @IsString({ message: 'Username harus berupa string' })
-  @IsNotEmpty({ message: 'Username tidak boleh kosong' })
-  username: string;
-}
