@@ -5,7 +5,6 @@ import { DestinationsModule } from './destinations/destinations.module';
 import { ConfigModule } from '@nestjs/config';
 import { StoragesModule } from './storages/storages.module';
 import { OrdersModule } from './orders/orders.module';
-import { OrdersNotificationsModule } from './orders-notifications/orders-notifications.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { APP_GUARD, Reflector } from '@nestjs/core';
@@ -31,7 +30,6 @@ import { ChatsModule } from './chats/chats.module';
     LoggerModule,
     StoragesModule,
     DestinationsModule,
-    OrdersNotificationsModule,
     DriverLocationsModule,
     RedisModule,
     PaymentsModule,

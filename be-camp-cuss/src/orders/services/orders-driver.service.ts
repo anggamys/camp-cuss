@@ -1,11 +1,11 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
-import { Order, UserRole } from '@prisma/client';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 import { OrderStatus } from '../../common/enums/order.enum';
 import { ErrorHelper } from '../../common/helpers/error.helper';
-import { PrismaHelper } from '../../common/helpers/prisma.helper';
 import { ChatsService } from '../../chats/chats.service';
+import { OrderResponseDto, toResponseDto } from '../dto/order-response.dto';
+import { Role } from '../../common/enums/user.enum';
 
 @Injectable()
 export class OrdersDriverService {
@@ -13,12 +13,14 @@ export class OrdersDriverService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly prismaHelper: PrismaHelper,
     private readonly chatsService: ChatsService,
     private readonly logger: AppLoggerService,
   ) {}
 
-  async acceptOrder(orderId: number, driverId: number): Promise<Order> {
+  async acceptOrder(
+    orderId: number,
+    driverId: number,
+  ): Promise<OrderResponseDto> {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const [order, driver] = await Promise.all([
@@ -33,7 +35,7 @@ export class OrdersDriverService {
           );
         }
 
-        if (!driver || driver.role !== UserRole.driver) {
+        if (!driver || (driver.role as Role) !== Role.Driver) {
           throw new HttpException(
             'Pengguna bukan driver',
             HttpStatus.BAD_REQUEST,
@@ -100,7 +102,7 @@ export class OrdersDriverService {
           userIds: [driverId, order.customer_id],
         });
 
-        return updatedOrder!;
+        return toResponseDto(updatedOrder!);
       });
     } catch (err) {
       ErrorHelper.handle(
@@ -112,7 +114,10 @@ export class OrdersDriverService {
     }
   }
 
-  async completeOrder(orderId: number, driverId: number): Promise<Order> {
+  async completeOrder(
+    orderId: number,
+    driverId: number,
+  ): Promise<OrderResponseDto> {
     this.logger.debug(
       `Driver ${driverId} mencoba menyelesaikan pesanan #${orderId}`,
       this.context,
@@ -153,7 +158,11 @@ export class OrdersDriverService {
         this.context,
       );
 
-      return updated;
+      const data: OrderResponseDto = toResponseDto({
+        ...updated,
+      });
+
+      return data;
     } catch (e) {
       ErrorHelper.handle(
         e,

@@ -1,9 +1,9 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
-import { Order } from '@prisma/client';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 import { OrderStatus } from '../../common/enums/order.enum';
 import { ErrorHelper } from '../../common/helpers/error.helper';
+import { OrderResponseDto, toResponseDto } from '../dto/order-response.dto';
 
 @Injectable()
 export class OrdersCustomerService {
@@ -14,23 +14,10 @@ export class OrdersCustomerService {
     private readonly logger: AppLoggerService,
   ) {}
 
-  async findByCustomerId(customerId: number): Promise<Order[]> {
-    try {
-      return await this.prisma.order.findMany({
-        where: { customer_id: customerId },
-        orderBy: { created_at: 'desc' },
-      });
-    } catch (err) {
-      ErrorHelper.handle(
-        err,
-        this.logger,
-        this.context,
-        `Gagal mengambil data pesanan untuk customer #${customerId}`,
-      );
-    }
-  }
-
-  async cancelOrder(orderId: number, customerId: number): Promise<Order> {
+  async cancelOrder(
+    orderId: number,
+    customerId: number,
+  ): Promise<OrderResponseDto> {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -61,7 +48,11 @@ export class OrdersCustomerService {
         this.context,
       );
 
-      return updated;
+      const data: OrderResponseDto = toResponseDto({
+        ...updated,
+      });
+
+      return data;
     } catch (err) {
       ErrorHelper.handle(
         err,

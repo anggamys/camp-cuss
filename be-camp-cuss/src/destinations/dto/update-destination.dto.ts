@@ -1,35 +1,9 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateDestinationDto } from './create-destination.dto';
-import {
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { IsNotEmpty, IsNumber } from 'class-validator';
 
 export class UpdateDestinationDto extends PartialType(CreateDestinationDto) {
   @IsNumber({}, { message: 'id harus berupa angka' })
   @IsNotEmpty({ message: 'id tidak boleh kosong' })
   id: number;
-}
-
-export class responseUpdateDestinationDto {
-  @IsNumber({}, { message: 'id harus berupa angka' })
-  id: number;
-
-  @IsString({ message: 'nama harus berupa string' })
-  @IsNotEmpty({ message: 'nama tidak boleh kosong' })
-  name: string;
-
-  @IsString({ message: 'image_place harus berupa string' })
-  @IsOptional()
-  image_place: string | null;
-
-  @IsNumber({}, { message: 'estimated harus berupa angka' })
-  @Min(0, { message: 'estimated harus bernilai minimal 0' })
-  estimated: number;
-
-  created_at: Date;
-  updated_at: Date;
 }

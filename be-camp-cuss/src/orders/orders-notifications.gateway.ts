@@ -10,11 +10,11 @@ import {
 import { Server } from 'socket.io';
 import { UseGuards, UseInterceptors } from '@nestjs/common';
 import { SocketWithUser } from '../common/types/socket-user.interface';
-import { OrderAvailableNotificationDto } from './dto/orders-notification.dto';
 import { ToggleOrderSubscriptionDto } from './dto/toggle-order-subs.dto';
 import { WsJwtGuard } from '../common/guards/ws-jwt.guard';
 import { WsTransformInterceptor } from '../common/interceptors/ws-transform.interceptor';
 import { AppLoggerService } from '../common/loggers/app-logger.service';
+import { OrderResponseDto } from './dto/order-response.dto';
 
 @UseGuards(WsJwtGuard)
 @UseInterceptors(WsTransformInterceptor)
@@ -86,7 +86,7 @@ export class OrdersNotificationsGateway implements OnGatewayInit {
   }
 
   async broadcastNewOrderAvailable(
-    notification: OrderAvailableNotificationDto,
+    notification: OrderResponseDto,
   ): Promise<void> {
     if (!this.serverReady) return;
 

@@ -1,9 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
-import { OrdersNotificationsGateway } from '../../orders-notifications/orders-notifications.gateway';
-import { Order } from '@prisma/client';
+import { OrdersNotificationsGateway } from '../orders-notifications.gateway';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 import { OrderStatus } from '../../common/enums/order.enum';
+import { OrderResponseDto, toResponseDto } from '../dto/order-response.dto';
 
 @Injectable()
 export class OrdersBroadcastService implements OnModuleInit {
@@ -19,37 +19,49 @@ export class OrdersBroadcastService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     const pendingOrders = await this.prisma.order.findMany({
       where: { status: OrderStatus.pending },
+      include: { customer: true, driver: true },
     });
 
     if (pendingOrders.length === 0) return;
 
     await this.waitForGatewayReady();
+
     this.logger.log(
       `Memulihkan ${pendingOrders.length} order pending`,
       this.context,
     );
 
     for (const order of pendingOrders) {
-      this.broadcastAndSchedule(order.id, order);
+      this.broadcastAndSchedule(
+        order.id,
+        toResponseDto({
+          ...order,
+          driver: order.driver === null ? undefined : order.driver,
+        }),
+      );
     }
   }
 
   private async waitForGatewayReady(): Promise<void> {
     let retries = 0;
+
     while (!this.gateway['serverReady'] && retries < 20) {
       await new Promise((r) => setTimeout(r, 250));
       retries++;
     }
+
     if (!this.gateway['serverReady']) {
       this.logger.error('Gateway tidak siap setelah 5 detik', this.context);
     }
   }
 
-  broadcastAndSchedule(orderId: number, order: Order): void {
+  broadcastAndSchedule(orderId: number, order: OrderResponseDto): void {
     if (this.activeIntervals.has(orderId)) return;
 
     this.logger.log(`Broadcast awal untuk order #${orderId}`, this.context);
+
     void this.gateway.broadcastNewOrderAvailable(order);
+
     this.startRebroadcastLoop(orderId);
   }
 
@@ -57,6 +69,7 @@ export class OrdersBroadcastService implements OnModuleInit {
     if (this.activeIntervals.has(orderId)) return;
 
     let tick = 0;
+
     const interval = setInterval(() => {
       void this.checkAndRebroadcast(orderId, tick++);
     }, 1000);
@@ -70,6 +83,7 @@ export class OrdersBroadcastService implements OnModuleInit {
   ): Promise<void> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
+      include: { customer: true, driver: true },
     });
 
     if (!order || order.status !== String(OrderStatus.pending)) {
@@ -81,7 +95,12 @@ export class OrdersBroadcastService implements OnModuleInit {
     }
 
     if (tick <= 10 || tick % 5 === 0) {
-      await this.gateway.broadcastNewOrderAvailable(order);
+      await this.gateway.broadcastNewOrderAvailable(
+        toResponseDto({
+          ...order,
+          driver: order.driver === null ? undefined : order.driver,
+        }),
+      );
     }
   }
 
