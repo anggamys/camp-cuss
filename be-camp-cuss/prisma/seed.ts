@@ -130,30 +130,30 @@ async function bootstrap() {
 
     // Destinasi
     const seedDestinations: Partial<
-      CreateDestinationDto & { imageFile: string }
+      CreateDestinationDto & { imagePlace: string }
     >[] = [
       {
         name: 'Fakultas Ilmu Komputer',
         estimated: 15,
-        imageFile:
+        imagePlace:
           'destinations/1762219317083-7f86218c-d63a-46b0-827e-627f0a2b084a.png',
       },
       {
         name: 'Gedung Rektorat',
         estimated: 15,
-        imageFile:
+        imagePlace:
           'destinations/1762219318211-09cc8497-41ec-4eb3-8fce-f421f48f2fab.jpg',
       },
       {
         name: 'Fakultas Kedokteran',
         estimated: 15,
-        imageFile:
+        imagePlace:
           'destinations/1762219318479-d7787756-7ea6-4ec3-bd02-8ac48c729a89.jpg',
       },
       {
         name: 'Perpustakaan Pusat',
         estimated: 10,
-        imageFile:
+        imagePlace:
           'destinations/1762219318860-c4e965c4-5078-458c-8236-5518b1a6f320.jpg',
       },
     ];
@@ -162,15 +162,16 @@ async function bootstrap() {
       id: number;
       name: string;
       estimated: number;
-      image_place: string;
+      imagePlace: string;
     };
     const createdDestinations: CreatedDestination[] = [];
     for (const dest of seedDestinations) {
       const created = await destinationsService.create({
         name: dest.name!,
         estimated: dest.estimated!,
-        image_place: dest.imageFile!,
+        imagePlace: dest.imagePlace!,
       });
+
       createdDestinations.push(created as CreatedDestination);
       logger.log(`Destination ${created.name} berhasil dibuat`, loggerName);
     }

@@ -14,7 +14,7 @@ import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { UserPayload } from '../../common/types/user-context.interface';
 import { ApiResponse } from '../../common/types/api-response.interface';
-import { AuthService } from '../auth.service';
+import { AuthService } from '../../auth/auth.service';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
 
 interface RequestWithHeaders {

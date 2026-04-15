@@ -2,6 +2,7 @@ node_modules
 .git
 .env
 README.md
+api-camp-cuss-test
 
 !dist
 !src

@@ -31,16 +31,19 @@ export class UsersUploadService {
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
     if (!user) {
       this.logger.warn(
         `User not found for updateUserFile (userId: ${userId})`,
         this.context,
       );
+
       throw new HttpException('Pengguna tidak ditemukan', HttpStatus.NOT_FOUND);
     }
 
     // Hapus file lama jika ada
     const oldKey = user[field];
+
     if (oldKey) {
       await this.storage
         .delete(oldKey, isPrivate)
@@ -60,10 +63,12 @@ export class UsersUploadService {
 
     // Upload file baru
     let uploaded: { key: string };
+
     try {
       uploaded = (await this.storage.upload(file, folder, isPrivate)) as {
         key: string;
       };
+
       this.logger.log(
         `File uploaded for userId: ${userId}, field: ${field}, key: ${uploaded.key}`,
         this.context,
@@ -73,6 +78,7 @@ export class UsersUploadService {
         `Failed to upload file for userId: ${userId}, field: ${field} - ${error instanceof Error ? error.message : error}`,
         this.context,
       );
+
       throw error;
     }
 
@@ -82,6 +88,7 @@ export class UsersUploadService {
       data: { [field]: uploaded.key },
       select: { id: true, username: true, [field]: true },
     });
+
     this.logger.log(
       `User updated with new file for userId: ${userId}, field: ${field}`,
       this.context,
@@ -95,11 +102,13 @@ export class UsersUploadService {
 
   async deleteAllUserFiles(userId: number) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
     if (!user) {
       this.logger.warn(
         `User not found for deleteAllUserFiles (userId: ${userId})`,
         this.context,
       );
+
       throw new HttpException('Pengguna tidak ditemukan', HttpStatus.NOT_FOUND);
     }
 
@@ -115,7 +124,9 @@ export class UsersUploadService {
       deletions.push(this.storage.delete(user.photo_driving_license, true));
 
     const results = await Promise.allSettled(deletions);
+
     const failed = results.filter((r) => r.status === 'rejected');
+
     if (failed.length > 0) {
       this.logger.warn(
         `Some files failed to delete for userId: ${userId} (${failed.length} failures)`,
@@ -127,6 +138,7 @@ export class UsersUploadService {
         this.context,
       );
     }
+
     return { message: 'Semua file pengguna berhasil dihapus' };
   }
 }

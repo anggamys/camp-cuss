@@ -11,14 +11,14 @@ export const RedisProvider: Provider[] = [
   {
     provide: REDIS_CLIENT,
     useFactory: (logger: AppLoggerService): Redis => {
-      const url = `redis://${Env.REDIS_HOST}:${Env.REDIS_PORT}`;
-      const client = new Redis(url);
+      const client = new Redis(Env.REDIS_URL);
       client.on('connect', () =>
-        logger.log(`[Redis] Publisher connected -> ${url}`, context),
+        logger.log(`[Redis] Publisher connected -> ${Env.REDIS_URL}`, context),
       );
-      client.on('error', (err) =>
-        logger.error(`[Redis] Error: ${err.message}`, context),
-      );
+      client.on('error', (err) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger.error(`[Redis] Error: ${errMsg}`, context);
+      });
       return client;
     },
     inject: [AppLoggerService],
@@ -30,9 +30,10 @@ export const RedisProvider: Provider[] = [
       sub.on('connect', () =>
         logger.log(`[Redis] Subscriber connected (duplicate)`, context),
       );
-      sub.on('error', (err) =>
-        logger.error(`[Redis] Subscriber error: ${err.message}`, context),
-      );
+      sub.on('error', (err) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger.error(`[Redis] Subscriber error: ${errMsg}`, context);
+      });
       return sub;
     },
     inject: [REDIS_CLIENT, AppLoggerService],

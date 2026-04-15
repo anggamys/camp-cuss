@@ -16,7 +16,8 @@ import { OrderStatus } from '../../common/enums/order.enum';
 import { Env } from '../../common/constants/env.constant';
 import { generateOrderCode } from '../../common/utils/order-code.util';
 import { OrderService } from '../../common/enums/order.enum';
-import { MidtransHelpers } from '../../common/helpers/midtrans.helpers';
+import { MidtransHelpers } from '../../common/helpers/midtrans.helper';
+import { ErrorHelper } from '../../common/helpers/error.helper';
 
 @Injectable()
 export class PaymentsMidtransService {
@@ -37,7 +38,7 @@ export class PaymentsMidtransService {
 
       const order = await this.prismaService.order.findUnique({
         where: { id: orderId },
-        include: { user: true },
+        include: { customer: true },
       });
 
       if (!order) {
@@ -50,7 +51,7 @@ export class PaymentsMidtransService {
       }
 
       this.logger.log(
-        `Order ditemukan: #${order.id}, User: ${order.user?.username}, Total: ${order.total_price}`,
+        `Order ditemukan: #${order.id}, Customer: ${order.customer?.username ?? 'Customer'}, Total: ${order.total_price}`,
         this.context,
       );
 
@@ -128,9 +129,9 @@ export class PaymentsMidtransService {
         ],
 
         customerDetails: {
-          firstName: order.user?.username ?? 'Customer',
-          email: order.user?.email ?? '',
-          phone: order.user?.no_phone ?? undefined,
+          firstName: order.customer?.username ?? 'Customer',
+          email: order.customer?.email ?? '',
+          phone: order.customer?.no_phone ?? undefined,
         },
 
         gopay: {
@@ -245,18 +246,12 @@ export class PaymentsMidtransService {
 
       return response;
     } catch (error) {
-      const errorMessage =
-        typeof error === 'object' && error !== null && 'message' in error
-          ? (error as { message: string }).message
-          : String(error);
-
-      this.logger.error(
-        `Gagal membuat transaksi Midtrans untuk orderId ${orderId}: ${errorMessage}`,
+      ErrorHelper.handle(
+        error,
+        this.logger,
         this.context,
-        typeof error === 'string' ? error : JSON.stringify(error),
+        `Gagal membuat transaksi untuk Order ID: ${orderId}`,
       );
-
-      throw error;
     }
   }
 }

@@ -20,23 +20,6 @@ export class TokenHelper {
     };
   }
 
-  /** Read numeric env var (in seconds) */
-  private static getNumber(config: ConfigService, key: string): number {
-    const raw = config.get<string>(key);
-    if (!raw) throw new Error(`Missing env: ${key}`);
-    const value = Number(raw);
-    if (isNaN(value) || value <= 0)
-      throw new Error(`Invalid number in ${key}: ${raw}`);
-    return value;
-  }
-
-  /** Read string env var */
-  private static getString(config: ConfigService, key: string): string {
-    const value = config.get<string>(key);
-    if (!value) throw new Error(`Missing env: ${key}`);
-    return value;
-  }
-
   /** Generate Access Token */
   static async generateAccessToken(
     jwt: JwtService,
@@ -48,6 +31,7 @@ export class TokenHelper {
       secret: env.JWT_ACCESS_SECRET,
       expiresIn: Number(env.JWT_ACCESS_EXPIRES),
     };
+
     return jwt.signAsync(payload, options);
   }
 
@@ -58,10 +42,12 @@ export class TokenHelper {
     user: User,
   ): Promise<string> {
     const payload = this.buildPayload(user);
+
     const options: JwtSignOptions = {
       secret: env.JWT_REFRESH_SECRET,
       expiresIn: Number(env.JWT_REFRESH_EXPIRES),
     };
+
     return jwt.signAsync(payload, options);
   }
 
@@ -82,11 +68,13 @@ export class TokenHelper {
           `${type} token telah kedaluwarsa`,
           HttpStatus.UNAUTHORIZED,
         );
+
       if (err instanceof JsonWebTokenError)
         throw new HttpException(
           `${type} token tidak valid`,
           HttpStatus.UNAUTHORIZED,
         );
+
       throw new HttpException(
         `Kesalahan verifikasi ${type} token`,
         HttpStatus.UNAUTHORIZED,
@@ -101,6 +89,7 @@ export class TokenHelper {
   ): Record<string, unknown> | null {
     try {
       const decoded: unknown = jwt.decode(token);
+
       return decoded && typeof decoded === 'object' && !Array.isArray(decoded)
         ? (decoded as Record<string, unknown>)
         : null;

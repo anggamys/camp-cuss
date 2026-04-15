@@ -10,24 +10,8 @@ export class loginDto {
   password: string;
 }
 
-export class responseLoginDto {
-  @IsString({ message: 'Access token harus berupa string' })
-  @IsNotEmpty({ message: 'Access token tidak boleh kosong' })
-  access_token: string;
-
-  @IsString({ message: 'Refresh token harus berupa string' })
-  @IsNotEmpty({ message: 'Refresh token tidak boleh kosong' })
-  refresh_token: string;
-}
-
 export class refreshTokenDto {
   @IsString({ message: 'Refresh token harus berupa string' })
   @IsNotEmpty({ message: 'Refresh token tidak boleh kosong' })
   refresh_token: string;
-}
-
-export class responseRefreshTokenDto {
-  @IsString({ message: 'Access token harus berupa string' })
-  @IsNotEmpty({ message: 'Access token tidak boleh kosong' })
-  access_token: string;
 }

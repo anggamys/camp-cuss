@@ -1,7 +1,7 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.services';
 import { AppLoggerService } from '../../common/loggers/app-logger.service';
-import { MidtransHelpers } from '../../common/helpers/midtrans.helpers';
+import { MidtransHelpers } from '../../common/helpers/midtrans.helper';
 import { PaymentStatus, OrderStatus } from '@prisma/client';
 import { MidtransCallbackDto } from '../dto/midtrans-callback.dto';
 

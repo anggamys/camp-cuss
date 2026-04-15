@@ -70,7 +70,7 @@ export class WsJwtGuard implements CanActivate {
       }
 
       client.user = {
-        id: decoded.sub,
+        userId: decoded.sub,
         username: decoded.username,
         role: decoded.role,
       };

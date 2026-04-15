@@ -7,17 +7,19 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { OrdersCoreService } from './services/orders-core.service';
 import { OrdersDriverService } from './services/orders-driver.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { JwtAuthGuard } from '../common/guards/jwt.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '../common/enums/role.enum';
+import { Role } from '../common/enums/user.enum';
 import { User } from '../common/decorators/user.decorator';
 import { OrdersCustomerService } from './services/orders-customer.service';
+import { ApiQueryParams } from '../common/types/api-request.interface';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,8 +32,11 @@ export class OrdersController {
 
   // Customer actions
   @Post()
-  @Roles(Role.customer)
-  async create(@User('id') customerId: number, @Body() dto: CreateOrderDto) {
+  @Roles(Role.Customer)
+  async create(
+    @Body() dto: CreateOrderDto,
+    @User('userId') customerId: number,
+  ) {
     const order = await this.ordersCore.create(customerId, dto);
     return {
       status: 'success',
@@ -42,19 +47,33 @@ export class OrdersController {
   }
 
   @Get()
-  @Roles(Role.admin, Role.customer, Role.driver)
-  async findAll(@User('role') role: Role, @User('id') userId: number) {
-    const orders = await this.ordersCore.findAll(role, userId);
+  @Roles(Role.Admin, Role.Customer, Role.Driver)
+  async findAll(
+    @User('role') role: Role,
+    @User('userId') userId: number,
+    @Query() query: ApiQueryParams,
+  ) {
+    const { data, meta } = await this.ordersCore.findAll(role, userId, query);
+
+    if (data.length === 0) {
+      return {
+        status: 'success',
+        message: 'Tidak ada pesanan ditemukan',
+        data: [],
+        meta,
+      };
+    }
+
     return {
       status: 'success',
-      message: 'Daftar pesanan berhasil diambil',
-      data: orders,
-      meta: { total: orders.length },
+      message: 'Daftar pesanan berhasil ditemukan',
+      data,
+      meta,
     };
   }
 
   @Get(':id')
-  @Roles(Role.admin, Role.customer, Role.driver)
+  @Roles(Role.Admin, Role.Customer, Role.Driver)
   async findOne(@Param('id') id: string) {
     const order = await this.ordersCore.findOne(+id);
     return {
@@ -66,7 +85,7 @@ export class OrdersController {
   }
 
   @Patch(':id')
-  @Roles(Role.admin)
+  @Roles(Role.Admin)
   async update(@Param('id') id: string, @Body() dto: UpdateOrderDto) {
     const order = await this.ordersCore.update(+id, dto);
     return {
@@ -78,7 +97,7 @@ export class OrdersController {
   }
 
   @Delete(':id')
-  @Roles(Role.admin)
+  @Roles(Role.Admin)
   async remove(@Param('id') id: string) {
     await this.ordersCore.remove(+id);
     return {
@@ -90,8 +109,11 @@ export class OrdersController {
   }
 
   @Post(':id/cancel')
-  @Roles(Role.customer)
-  async cancelOrder(@Param('id') orderId: string, @User('id') userId: number) {
+  @Roles(Role.Customer)
+  async cancelOrder(
+    @Param('id') orderId: string,
+    @User('userId') userId: number,
+  ) {
     const order = await this.ordercustomer.cancelOrder(+orderId, userId);
     return {
       status: 'success',
@@ -103,10 +125,10 @@ export class OrdersController {
 
   // Driver actions
   @Post(':id/accept')
-  @Roles(Role.driver)
+  @Roles(Role.Driver)
   async acceptOrder(
     @Param('id') orderId: string,
-    @User('id') driverId: number,
+    @User('userId') driverId: number,
   ) {
     const order = await this.ordersDriver.acceptOrder(+orderId, driverId);
     return {
@@ -118,10 +140,10 @@ export class OrdersController {
   }
 
   @Post(':id/complete')
-  @Roles(Role.driver)
+  @Roles(Role.Driver)
   async completeOrder(
     @Param('id') orderId: string,
-    @User('id') driverId: number,
+    @User('userId') driverId: number,
   ) {
     const order = await this.ordersDriver.completeOrder(+orderId, driverId);
     return {

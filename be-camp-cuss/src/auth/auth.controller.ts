@@ -2,7 +2,7 @@ import { Body, Controller, Post, UseGuards, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { User } from '../common/decorators/user.decorator';
-import { JwtAuthGuard } from './guards/jwt.guard';
+import { JwtAuthGuard } from '../common/guards/jwt.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { loginDto, refreshTokenDto } from './dto/login.dto';
 import { Request } from 'express';
@@ -17,7 +17,7 @@ export class AuthController {
     const user = await this.authService.register(body);
 
     return {
-      message: 'Registrasi berhasil',
+      message: 'Pengguna berhasil didaftarkan',
       data: user,
     };
   }
@@ -46,7 +46,7 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
-  async logout(@User('id') userId: number, @Req() request: Request) {
+  async logout(@User('userId') userId: number, @Req() request: Request) {
     const authHeader = request.headers.authorization;
     const token = authHeader?.replace('Bearer ', '');
 

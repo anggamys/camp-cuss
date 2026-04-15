@@ -7,16 +7,26 @@ ENV TZ=Asia/Jakarta \
     NODE_ENV=development
 
 # Install dependencies yang diperlukan build
-RUN apk add --no-cache openssl dumb-init
+RUN apk add --no-cache \
+    openssl \
+    dumb-init \
+    ca-certificates \
+    python3 \
+    make \
+    g++
 
 # Copy dependency files dulu agar caching lebih efisien
 COPY package*.json ./
 
-# Install dependency dev
-RUN npm ci --ignore-scripts --no-audit --prefer-offline
+# Install dependency dev (tanpa --ignore-scripts untuk prisma)
+RUN npm ci --no-audit --prefer-offline
 
 # Copy source code
-COPY . .
+COPY src ./src
+COPY prisma ./prisma
+COPY tsconfig*.json ./
+COPY nest-cli.json ./
+COPY eslint.config.mjs ./
 
 # Generate Prisma dan build NestJS
 RUN npx prisma generate && npx nest build
@@ -32,7 +42,11 @@ ENV TZ=Asia/Jakarta \
     NODE_ENV=production \
     PORT=3000
 
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache \
+    dumb-init \
+    postgresql-client \
+    curl \
+    ca-certificates
 
 # Copy hanya file yang dibutuhkan untuk runtime
 COPY package*.json ./

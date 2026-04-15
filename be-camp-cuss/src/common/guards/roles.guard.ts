@@ -7,7 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../../common/decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
-import { Role } from '../../common/enums/role.enum';
+import { Role } from '../enums/user.enum';
 import { RequestWithUser } from '../../common/types/user-context.interface';
 
 @Injectable()

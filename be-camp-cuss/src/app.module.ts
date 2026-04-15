@@ -5,12 +5,11 @@ import { DestinationsModule } from './destinations/destinations.module';
 import { ConfigModule } from '@nestjs/config';
 import { StoragesModule } from './storages/storages.module';
 import { OrdersModule } from './orders/orders.module';
-import { OrdersNotificationsModule } from './orders-notifications/orders-notifications.module';
-import { JwtStrategy } from './auth/strategies/jwt.strategy';
+import { JwtStrategy } from './common/strategies/jwt.strategy';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { APP_GUARD, Reflector } from '@nestjs/core';
-import { JwtAuthGuard } from './auth/guards/jwt.guard';
-import { RolesGuard } from './auth/guards/roles.guard';
+import { JwtAuthGuard } from './common/guards/jwt.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 import { LoggerModule } from './common/loggers/logger.module';
 import { RequestContextMiddleware } from './common/contexts/request-context.middleware';
 import { AuthService } from './auth/auth.service';
@@ -19,6 +18,7 @@ import { CommonModule } from './common/common.module';
 import { DriverLocationsModule } from './driver-locations/driver-locations.module';
 import { RedisModule } from './common/redis';
 import { PaymentsModule } from './payments/payments.module';
+import { ChatsModule } from './chats/chats.module';
 
 @Module({
   imports: [
@@ -30,10 +30,10 @@ import { PaymentsModule } from './payments/payments.module';
     LoggerModule,
     StoragesModule,
     DestinationsModule,
-    OrdersNotificationsModule,
     DriverLocationsModule,
     RedisModule,
     PaymentsModule,
+    ChatsModule,
   ],
   controllers: [],
   providers: [
