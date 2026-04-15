@@ -1,6 +1,49 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: be-camp-cuss-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-camp_cuss}
+      TZ: Asia/Jakarta
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-postgres}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - server-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: be-camp-cuss-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - server-network
+
   be-camp-cuss:
-    image: ghcr.io/nautronica/be-camp-cuss:latest
+    image: be-camp-cuss:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: be-camp-cuss
     restart: unless-stopped
     env_file:
@@ -9,6 +52,8 @@ services:
       NODE_ENV: production
       TZ: Asia/Jakarta
       LOG_LEVEL: info
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-camp_cuss}
+      REDIS_URL: redis://redis:6379
     ports:
       - '3000:3000'
     volumes:
@@ -32,6 +77,15 @@ services:
           memory: 256M
     networks:
       - server-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
 
 networks:
   server-network:

@@ -37,7 +37,7 @@ ENV TZ=Asia/Jakarta \
     NODE_ENV=production \
     PORT=3000
 
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init postgresql-client curl
 
 # Copy hanya file yang dibutuhkan untuk runtime
 COPY package*.json ./
